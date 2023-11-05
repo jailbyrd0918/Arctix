@@ -31,6 +31,17 @@ struct AX_Render_Vertex
 }
 SVertex;
 
+typedef
+struct AX_Render_Global_Uniform
+{
+	UMat4				projection;
+	UMat4				view;
+	
+	UMat4				reserved0;
+	UMat4				reserved1;
+}
+SGlobalUniform;
+
 struct AX_Render_Backend
 {
 	UInt64				frameCount;
@@ -41,6 +52,8 @@ struct AX_Render_Backend
 	Bool(*onResized)(SRenderBackend backend, Int32 width, Int32 height);
 	Bool(*onFrameBegin)(SRenderBackend backend, const Float deltaTime);
 	Bool(*onFrameEnd)(SRenderBackend backend, const Float deltaTime);
+	Bool(*updateGlobalState)(SRenderBackend backend, const UMat4 projection, const UMat4 view, const UVec3 viewPosition, const UVec4 ambientColor, const Int32 mode);
+	Bool(*updateObject)(SRenderBackend backend, const UMat4 model);
 };
 
 #define AX_RENDERER_ALLOCATE(type, count, name)							\

@@ -22,5 +22,15 @@ AX_Renderer_Backend_Vulkan_Shader_Shutdown
 
 AX_API
 Bool
+AX_Renderer_Backend_Vulkan_Shader_UpdateGlobalState
+(SVulkanShader *outShader);
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_Shader_UpdateObject
+(const SVulkanShader *shader, const UMat4 model);
+
+AX_API
+Bool
 AX_Renderer_Backend_Vulkan_Shader_Apply
 (SVulkanShader *outShader);

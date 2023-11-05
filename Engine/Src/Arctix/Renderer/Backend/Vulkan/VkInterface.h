@@ -30,6 +30,17 @@ Bool
 AX_Renderer_Backend_Vulkan_OnFrameEnd
 (SRenderBackend backend, const Float deltaTime);
 
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_UpdateGlobalState
+(SRenderBackend backend, const UMat4 projection, const UMat4 view, const UVec3 viewPosition, const UVec4 ambientColor, const Int32 mode);
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_UpdateObject
+(SRenderBackend backend, const UMat4 model);
+
+
 
 
 

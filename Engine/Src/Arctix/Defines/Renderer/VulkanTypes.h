@@ -222,29 +222,36 @@ struct AX_Vulkan_Pipeline
 SVulkanPipeline;
 
 typedef
-struct AX_Vulkan_Shader
-{
-	SVulkanShaderStage				stages[2]; // 2 stages: vertex and fragment
-
-	SVulkanPipeline					pipeline;
-}
-SVulkanShader;
-
-typedef
 struct AX_Vulkan_Buffer
 {
 	VkBuffer					instance;
-	
+
 	ByteSize					totalSize;
 	VkBufferUsageFlagBits				usageFlags;
-	
+
 	Bool						locked;
-	
+
 	VkDeviceMemory					memory;
 	Int32						memoryIndex;
 	UInt32						memoryPropertyFlags;
 }
 SVulkanBuffer;
+
+typedef
+struct AX_Vulkan_Shader
+{
+	SVulkanShaderStage				stages[2]; // 2 stages: vertex and fragment
+
+	SVulkanPipeline					pipeline;
+
+	VkDescriptorPool				globalDescriptorPool;
+	VkDescriptorSetLayout				globalDescriptorSetLayout;
+	VkDescriptorSet					globalDescriptorSets[3]; // 3 sets for triple-buffering
+
+	SGlobalUniform					globalUniform;
+	SVulkanBuffer					globalUniformBuffer;
+}
+SVulkanShader;
 
 typedef
 struct AX_Vulkan_Context

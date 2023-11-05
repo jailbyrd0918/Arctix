@@ -288,7 +288,6 @@ AX_Renderer_Backend_Vulkan_Buffer_LoadData
 	AX_HAL_Memory_Memcpy(dataPtr, data, size);
 	vkUnmapMemory(bufferContext->device.instance, buffer->memory);
 	
-	AX_LOG_DEBUG("Engine", "Vulkan buffer data loaded (to address: %p).", dataPtr);
 	return true;
 }
 
@@ -333,7 +332,6 @@ AX_Renderer_Backend_Vulkan_Buffer_Copy
 	))
 		return false;
 
-	AX_LOG_DEBUG("Engine", "Vulkan buffer copied (src: %p, dest: %p).", source, dest);
 	return true;
 }
 

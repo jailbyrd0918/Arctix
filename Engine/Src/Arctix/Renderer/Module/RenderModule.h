@@ -31,6 +31,11 @@ AX_Module_Render_RenderFrame
 (SRenderData renderData);
 
 AX_API AX_INLINE
+Bool
+AX_Module_Render_SetView
+(UMat4 view);
+
+AX_API AX_INLINE
 VoidPtr
 AX_Module_Render_GetModuleState
 (void);

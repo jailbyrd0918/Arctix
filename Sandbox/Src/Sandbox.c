@@ -7,10 +7,13 @@
 
 void OnStart (SGame *gameInst)
 {
+	AX_Gameplay_Game_Init(gameInst);
 }
 
 void OnUpdate (SGame *gameInst, const float deltaTime)
 {
+	AX_Gameplay_Game_Update(gameInst, deltaTime);
+	AX_Gameplay_Game_Render(gameInst, deltaTime);
 }
 
 

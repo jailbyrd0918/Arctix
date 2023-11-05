@@ -584,11 +584,20 @@ AX_Renderer_Backend_Vulkan_Helper_CreateGraphicsPipeline
 
 	// pipeline layout
 	{
+		VkPushConstantRange pushConstantRange = {
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+			.offset = sizeof(UMat4) * 0,
+			.size = sizeof(UMat4) * 2
+		};
+
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 
 			.setLayoutCount = descriptorSetLayoutCount,
-			.pSetLayouts = descriptorSetLayouts
+			.pSetLayouts = descriptorSetLayouts,
+
+			.pushConstantRangeCount = 1,
+			.pPushConstantRanges = &pushConstantRange
 		};
 
 		AX_VK_ASSERT(

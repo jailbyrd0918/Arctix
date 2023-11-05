@@ -474,8 +474,8 @@ _AX_Renderer_Backend_Vulkan_RecreateSwapchain
 		return false;
 
 	context.mainRenderPass.size = AX_Math_Vec2_Construct(
-		AX_Window_GetWidth(context.window),
-		AX_Window_GetHeight(context.window)
+		AX_CAST(Float, AX_Window_GetWidth(context.window)),
+		AX_CAST(Float, AX_Window_GetHeight(context.window))
 	);
 
 	// update framebuffer size iteration
@@ -488,12 +488,6 @@ _AX_Renderer_Backend_Vulkan_RecreateSwapchain
 	for (UInt32 i = 0; i < context.swapchain.imageCount; ++i)
 		if (!AX_Renderer_Backend_Vulkan_Framebuffer_Shutdown(i, &(context.swapchain.framebuffers[i])))
 			return false;
-
-	context.mainRenderPass.size = AX_Math_Vec2_Zero();
-	context.mainRenderPass.size = AX_Math_Vec2_Construct(
-		AX_Window_GetWidth(context.window),
-		AX_Window_GetHeight(context.window)
-	);
 
 	if (!_AX_Renderer_Backend_Vulkan_RegenerateFramebuffers())
 		return false;
@@ -750,32 +744,34 @@ AX_Renderer_Backend_Vulkan_OnStartup
 
 		// TODO: temp - remove this
 		{
+			const Float f = 1.0f;
+
 			SVertex vertices[] = {
 				[0] = {	
 					.position = {
-						.x = -0.5,
-						.y = -0.5
+						.x = -0.5f * f,
+						.y = -0.5f * f
 					}
 				},
 				
 				[1] = {	
 					.position = {
-						.x = 0.5,
-						.y = -0.5
+						.x = 0.5f * f,
+						.y = -0.5f * f
 					}
 				},
 				
 				[2] = {	
 					.position = {
-						.x = 0.5,
-						.y = 0.5
+						.x = 0.5f * f,
+						.y = 0.5f * f
 					}
 				},
 				
 				[3] = {	
 					.position = {
-						.x = -0.5,
-						.y = 0.5
+						.x = -0.5f * f,
+						.y = 0.5f * f
 					}
 				}
 			};
@@ -991,16 +987,16 @@ AX_Renderer_Backend_Vulkan_OnFrameBegin
 		const UInt32 framebufferHeight = AX_Window_GetHeight(context.window);
 
 		VkViewport viewport = {
-			.x = 0,
-			.y = framebufferHeight,
-			.width = framebufferWidth,
-			.height = framebufferHeight * -1.0f,
+			.x = 0.0f,
+			.y = AX_CAST(Float, framebufferHeight),
+			.width = AX_CAST(Float, framebufferWidth),
+			.height = AX_CAST(Float, framebufferHeight) * -1.0f,
 			.minDepth = 0.0f,
 			.maxDepth = 1.0f
 		};
 
 		VkRect2D scissor = {
-			.offset = {0, 0},
+			.offset = { 0, 0 },
 			.extent = { framebufferWidth, framebufferHeight }
 		};
 
@@ -1016,30 +1012,6 @@ AX_Renderer_Backend_Vulkan_OnFrameBegin
 			context.swapchain.framebuffers[context.imageIndex].instance
 		))
 			return false;
-	}
-
-	// TODO: temp - remove this
-	{
-		if (!AX_Renderer_Backend_Vulkan_Shader_Apply(&(context.objectShader)))
-			return false;
-
-		VkDeviceSize offsets[] = { 0 };
-		vkCmdBindVertexBuffers(
-			commandBuffer->instance, 
-			0, 
-			1, 
-			&(context.vertexBuffer.instance), 
-			offsets
-		);
-
-		vkCmdBindIndexBuffer(
-			commandBuffer->instance, 
-			context.indexBuffer.instance, 
-			0, 
-			VK_INDEX_TYPE_UINT32
-		);
-
-		vkCmdDrawIndexed(commandBuffer->instance, 6, 1, 0, 0, 0);
 	}
 
 	return true;
@@ -1117,5 +1089,58 @@ AX_Renderer_Backend_Vulkan_OnFrameEnd
 	return true;
 }
 
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_UpdateGlobalState
+(SRenderBackend backend, const UMat4 projection, const UMat4 view, const UVec3 viewPosition, const UVec4 ambientColor, const Int32 mode)
+{
+	if (!backend)
+		return false;
+	
+	SVulkanCommandBuffer *commandBuffer = &(context.arrCommandBuffers[context.imageIndex]);
+
+	if(!AX_Renderer_Backend_Vulkan_Shader_Apply(&(context.objectShader)))
+		return false;
+
+	context.objectShader.globalUniform.projection = projection;
+	context.objectShader.globalUniform.view = view;
+
+	if (!AX_Renderer_Backend_Vulkan_Shader_UpdateGlobalState(&(context.objectShader)))
+		return false;
+
+	return true;
+}
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_UpdateObject
+(SRenderBackend backend, const UMat4 model)
+{
+	if (!backend)
+		return false;
+	
+	SVulkanCommandBuffer *commandBuffer = &(context.arrCommandBuffers[context.imageIndex]);
+	
+	if (!AX_Renderer_Backend_Vulkan_Shader_UpdateObject(&(context.objectShader), model))
+		return false;
+
+	// TODO: temp - remove this
+	if (!AX_Renderer_Backend_Vulkan_Shader_Apply(&(context.objectShader)))
+		return false;
+
+	// bind vertex buffer
+	{
+		VkDeviceSize offsets[] = { 0 };
+		vkCmdBindVertexBuffers(commandBuffer->instance, 0, 1, &(context.vertexBuffer.instance), offsets);
+	}
+
+	// bind index buffer
+	vkCmdBindIndexBuffer(commandBuffer->instance, context.indexBuffer.instance, 0, VK_INDEX_TYPE_UINT32);
+
+	// issue drawing
+	vkCmdDrawIndexed(commandBuffer->instance, 6, 1, 0, 0, 0);
+
+	return true;
+}
 
 

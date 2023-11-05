@@ -26,6 +26,8 @@ AX_Renderer_Backend_Construct
 			backend->onResized = AX_Renderer_Backend_Vulkan_OnResized;
 			backend->onFrameBegin = AX_Renderer_Backend_Vulkan_OnFrameBegin;
 			backend->onFrameEnd = AX_Renderer_Backend_Vulkan_OnFrameEnd;
+			backend->updateGlobalState = AX_Renderer_Backend_Vulkan_UpdateGlobalState;
+			backend->updateObject = AX_Renderer_Backend_Vulkan_UpdateObject;
 		}
 		break;
 

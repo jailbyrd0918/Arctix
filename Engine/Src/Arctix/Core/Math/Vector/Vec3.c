@@ -226,9 +226,9 @@ Bool
 AX_Math_Vec3_Equals
 (UVec3 left, UVec3 right)
 {
-	return (((left.x - right.x) < AX_MATH_EPSILON) && 
-		((left.y - right.y) < AX_MATH_EPSILON) && 
-		((left.z - right.z) < AX_MATH_EPSILON));
+	return	(AX_Math_Abs(left.x - right.x) < AX_MATH_EPSILON) &&
+		(AX_Math_Abs(left.y - right.y) < AX_MATH_EPSILON) &&
+		(AX_Math_Abs(left.z - right.z) < AX_MATH_EPSILON);
 }
 
 AX_API AX_INLINE
@@ -236,7 +236,9 @@ Bool
 AX_Math_Vec3_ApproxEquals
 (UVec3 left, UVec3 right, Float limit)
 {
-	return (((left.x - right.x) <= limit) && ((left.y - right.y) <= limit) && ((left.z - right.z) <= limit));
+	return	(AX_Math_Abs(left.x - right.x) <= limit) &&
+		(AX_Math_Abs(left.y - right.y) <= limit) &&
+		(AX_Math_Abs(left.z - right.z) <= limit);
 }
 
 AX_API AX_INLINE
