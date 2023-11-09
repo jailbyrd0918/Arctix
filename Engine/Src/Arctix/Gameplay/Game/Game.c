@@ -11,32 +11,36 @@
 
 #include "Arctix/Renderer/Module/RenderModule.h"
 
+#include <SDL2/SDL.h>
+
 
 typedef
 struct AX_Gameplay_Game_State
 {
+	UMat4		projection;
 	UMat4		view;
 
 	UVec3		cameraPosition;
 	UVec3		cameraEulerRotation;
 
-	Bool		cameraViewDirty;
+	Bool		cameraViewOutdated;
 }
 SGameState;
 
 static SGameState *gameState;
 
+static Bool firstMouse = true;
 static Float lastMouseX = 0.0f;
 static Float lastMouseY = 0.0f;
-static Float yaw = 0.0f;
-static Float pitch = 0.0f;
+static Float mouseSensitivity = 0.25f;
 
+static Float fov = 45.0f;
 
 Bool
 _AX_Gameplay_Game_RecalculateViewMatrix
 (void)
 {
-	if (!gameState->cameraViewDirty)
+	if (!gameState->cameraViewOutdated)
 		return false;
 
 	UMat4 rotation = AX_Math_Mat4_MakeRotationXYZ(
@@ -45,12 +49,13 @@ _AX_Gameplay_Game_RecalculateViewMatrix
 		gameState->cameraEulerRotation.z
 	);
 
-	UMat4 translation = AX_Math_Mat4_MakeTranslation(&(gameState->cameraPosition));
+	UVec3 targetPosition = AX_Math_Vec3_Add(gameState->cameraPosition, AX_Math_Vec3_Forward());
+	UMat4 translation = AX_Math_Mat4_MakeTranslation(&(targetPosition));
 
 	gameState->view = AX_Math_Mat4_Mul(&rotation, &translation);
 	AX_Math_Mat4_Inverse(&(gameState->view));
 
-	gameState->cameraViewDirty = false;
+	gameState->cameraViewOutdated = false;
 	return true;
 }
 
@@ -59,7 +64,7 @@ _AX_Gameplay_Game_CameraYaw
 (const Float value)
 {
 	gameState->cameraEulerRotation.y += value;
-	gameState->cameraViewDirty = true;
+	gameState->cameraViewOutdated = true;
 }
 
 void
@@ -71,7 +76,7 @@ _AX_Gameplay_Game_CameraPitch
 	const Float limit = AX_MATH_DEG_TO_RAD(89.0f);
 	gameState->cameraEulerRotation.x = AX_MATH_CLAMP(gameState->cameraEulerRotation.x, limit * -1.0f, limit);
 
-	gameState->cameraViewDirty = true;
+	gameState->cameraViewOutdated = true;
 }
 
 
@@ -91,10 +96,7 @@ AX_Gameplay_Game_Init
 	gameState->view = AX_Math_Mat4_MakeTranslation(&(gameState->cameraPosition));
 	AX_Math_Mat4_Inverse(&(gameState->view));
 
-	gameState->cameraViewDirty = true;
-
-	lastMouseX = AX_CAST(Float, AX_HAL_Input_GetMouseX());
-	lastMouseY = AX_CAST(Float, AX_HAL_Input_GetMouseY());
+	gameState->cameraViewOutdated = true;
 
 	return true;
 }
@@ -123,21 +125,14 @@ AX_Gameplay_Game_Update
 
 	gameState = AX_CAST(SGameState *, game->gameState);
 
-	Float mouseX = AX_CAST(Float, AX_HAL_Input_GetMouseX());
-	Float mouseY = AX_CAST(Float, AX_HAL_Input_GetMouseY());
-
-	Float xOffset = mouseX - lastMouseX;
-	Float yOffset = mouseY - lastMouseY;
-
-	lastMouseX = mouseX;
-	lastMouseY = mouseY;
-
 	// TODO: temp - remove this
 	{
 		const Float moveSpeed = 20.0f;
 		UVec3 velocity = AX_Math_Vec3_Zero();
 
 		if (AX_HAL_Input_IsMouseButtonDown(AX_MOUSECODE_RIGHT)) {
+			SDL_ShowCursor(SDL_DISABLE);
+
 			if (AX_HAL_Input_IsKeyDown(AX_KEYCODE_W)) {
 				UVec3 forward = AX_Math_Mat4_MakeForwardVector(&(gameState->view));
 				velocity = AX_Math_Vec3_Add(velocity, forward);
@@ -158,12 +153,29 @@ AX_Gameplay_Game_Update
 				velocity = AX_Math_Vec3_Add(velocity, right);
 			}
 
-			if (xOffset != 0)
-				_AX_Gameplay_Game_CameraYaw((xOffset / AX_Math_Abs(xOffset)) * deltaTime);
-			
-			if (yOffset != 0)
-				_AX_Gameplay_Game_CameraPitch((yOffset / AX_Math_Abs(yOffset)) * deltaTime);
+			Float mouseX = AX_CAST(Float, AX_HAL_Input_GetMouseX());
+			Float mouseY = AX_CAST(Float, AX_HAL_Input_GetMouseY());
 
+			if (firstMouse) {
+				lastMouseX = mouseX;
+				lastMouseY = mouseY;
+				firstMouse = false;
+			}
+
+			Float xOffset = mouseX - lastMouseX;
+			Float yOffset = lastMouseY - mouseY;
+			
+			if ((xOffset != 0) || (yOffset != 0)) {
+				lastMouseX = mouseX;
+				lastMouseY = mouseY;
+
+				_AX_Gameplay_Game_CameraYaw(xOffset * mouseSensitivity * deltaTime);
+				_AX_Gameplay_Game_CameraPitch(yOffset * mouseSensitivity * deltaTime);
+			}
+		}
+		else {
+			SDL_ShowCursor(SDL_ENABLE);
+			firstMouse = true;
 		}
 
 		UVec3 z = AX_Math_Vec3_Zero();
@@ -173,14 +185,22 @@ AX_Gameplay_Game_Update
 			gameState->cameraPosition.y += velocity.y * moveSpeed * deltaTime;
 			gameState->cameraPosition.z += velocity.z * moveSpeed * deltaTime;
 
-			gameState->cameraViewDirty = true;
+			gameState->cameraViewOutdated = true;
 		}
+
+		gameState->projection = AX_Math_Mat4_Perspective(
+			AX_MATH_DEG_TO_RAD(fov),
+			AX_CAST(Float, game->gameConfig.winConfig.width) / game->gameConfig.winConfig.height,
+			0.1f,
+			1000.f
+		);
+
+		AX_Module_Render_SetProjection(gameState->projection);
 
 		if (!_AX_Gameplay_Game_RecalculateViewMatrix())
 			return false;
-
-		if (!AX_Module_Render_SetView(gameState->view))
-			return false;
+		
+		AX_Module_Render_SetView(gameState->view);
 	}
 
 	return true;

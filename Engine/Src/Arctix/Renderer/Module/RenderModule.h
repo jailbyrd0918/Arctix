@@ -31,9 +31,15 @@ AX_Module_Render_RenderFrame
 (SRenderData renderData);
 
 AX_API AX_INLINE
-Bool
+void
+AX_Module_Render_SetProjection
+(UMat4 projection);
+
+AX_API AX_INLINE
+void
 AX_Module_Render_SetView
 (UMat4 view);
+
 
 AX_API AX_INLINE
 VoidPtr

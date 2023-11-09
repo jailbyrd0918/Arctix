@@ -277,9 +277,9 @@ UMat4
 AX_Math_Mat4_LookAt
 (UVec3 *position, UVec3 *target, UVec3 *up)
 {
-	#define Z_AXIS	AX_Math_Vec3_Normalized(AX_Math_Vec3_Sub(*target, *position))
-	#define	X_AXIS	AX_Math_Vec3_Normalized(AX_Math_Vec3_Cross(Z_AXIS, *up))
-	#define	Y_AXIS	AX_Math_Vec3_Cross(X_AXIS, Z_AXIS)
+	#define Z_AXIS	AX_Math_Vec3_Normalized(AX_Math_Vec3_Sub(*position, *target))
+	#define	X_AXIS	AX_Math_Vec3_Normalized(AX_Math_Vec3_Cross(*up, Z_AXIS))
+	#define	Y_AXIS	AX_Math_Vec3_Cross(Z_AXIS, X_AXIS)
 
 	return
 		(!position || !target || !up) ?
@@ -289,21 +289,21 @@ AX_Math_Mat4_LookAt
 			.elements[0] = X_AXIS.x,
 			.elements[1] = X_AXIS.y,
 			.elements[2] = X_AXIS.z,
-			.elements[3] = (AX_Math_Vec3_Dot(X_AXIS, *position) * -1.0f),
+			.elements[3] = 0.0f,
 
 			.elements[4] = Y_AXIS.x,
 			.elements[5] = Y_AXIS.y,
 			.elements[6] = Y_AXIS.z,
-			.elements[7] = (AX_Math_Vec3_Dot(Y_AXIS, *position) * -1.0f),
+			.elements[7] = 0.0f,
 
 			.elements[8] = (Z_AXIS.x * -1.0f),
 			.elements[9] = (Z_AXIS.y * -1.0f),
 			.elements[10] = (Z_AXIS.z * -1.0f),
-			.elements[11] = (AX_Math_Vec3_Dot(Z_AXIS, *position) * -1.0f),
+			.elements[11] = 0.0f,
 
-			.elements[12] = 0.0f,
-			.elements[13] = 0.0f,
-			.elements[14] = 0.0f,
+			.elements[12] = position->x,
+			.elements[13] = position->y,
+			.elements[14] = position->z,
 			.elements[15] = 1.0f
 		);
 }
