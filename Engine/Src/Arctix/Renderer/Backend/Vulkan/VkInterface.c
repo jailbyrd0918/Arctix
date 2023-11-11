@@ -50,6 +50,7 @@
 
 static SVulkanContext context;
 static SDL_Window *contextWindow = NULL;
+static Float contextDeltaTime = 0.0f;
 
 
 VKAPI_ATTR VkBool32
@@ -747,36 +748,56 @@ AX_Renderer_Backend_Vulkan_OnStartup
 			const Float f = 1.0f;
 
 			SVertex vertices[] = {
-				[0] = {	
+				[0] = {
 					.position = {
 						.x = -0.5f * f,
 						.y = -0.5f * f
+					},
+
+					.textureCoordinate = {
+						.u = 0.0f,
+						.v = 0.0f
 					}
 				},
-				
-				[1] = {	
-					.position = {
-						.x = 0.5f * f,
-						.y = -0.5f * f
-					}
-				},
-				
-				[2] = {	
+
+				[1] = {
 					.position = {
 						.x = 0.5f * f,
 						.y = 0.5f * f
+					},
+
+					.textureCoordinate = {
+						.u = 1.0f,
+						.v = 1.0f
 					}
 				},
-				
-				[3] = {	
+
+				[2] = {
 					.position = {
 						.x = -0.5f * f,
 						.y = 0.5f * f
+					},
+
+					.textureCoordinate = {
+						.u = 0.0f,
+						.v = 1.0f
+					}
+				},
+
+				[3] = {
+					.position = {
+						.x = 0.5f * f,
+						.y = -0.5f * f
+					},
+
+					.textureCoordinate = {
+						.u = 1.0f,
+						.v = 0.0f
 					}
 				}
 			};
 
-			UInt32 indices[] = { 0, 1, 2, 0, 2, 3 };
+			UInt32 indices[] = { 0, 1, 2, 0, 3, 1 };
 
 			if (!_AX_Renderer_Backend_Vulkan_UploadData(
 				context.device.graphicsCommandPool,
@@ -799,6 +820,14 @@ AX_Renderer_Backend_Vulkan_OnStartup
 				&(context.indexBuffer)
 			))
 				return false;
+
+			UInt32 objectID = 0;
+
+			if (!AX_Renderer_Backend_Vulkan_Shader_AcquireResources(
+				&(context.objectShader),
+				&objectID
+			))
+				return false;
 		}
 	}
 
@@ -818,6 +847,9 @@ AX_Renderer_Backend_Vulkan_OnShutdown
 	{
 		// wait for all operations to complete
 		AX_VK_ASSERT(vkDeviceWaitIdle(context.device.instance));
+
+		if (!AX_Renderer_Backend_Vulkan_Shader_ReleaseResources(&(context.objectShader), 0))
+			return false;
 
 		// buffers
 		if (!_AX_Renderer_Backend_Vulkan_DestroyBuffers())
@@ -942,6 +974,8 @@ Bool
 AX_Renderer_Backend_Vulkan_OnFrameBegin
 (SRenderBackend backend, const Float deltaTime)
 {
+	contextDeltaTime = deltaTime;
+
 	if (!backend)
 		return false;
 
@@ -1105,7 +1139,7 @@ AX_Renderer_Backend_Vulkan_UpdateGlobalState
 	context.objectShader.globalUniform.projection = projection;
 	context.objectShader.globalUniform.view = view;
 
-	if (!AX_Renderer_Backend_Vulkan_Shader_UpdateGlobalState(&(context.objectShader)))
+	if (!AX_Renderer_Backend_Vulkan_Shader_UpdateGlobalState(&(context.objectShader), contextDeltaTime))
 		return false;
 
 	return true;
@@ -1114,14 +1148,14 @@ AX_Renderer_Backend_Vulkan_UpdateGlobalState
 AX_API
 Bool
 AX_Renderer_Backend_Vulkan_UpdateObject
-(SRenderBackend backend, const UMat4 model)
+(SRenderBackend backend, const SGeometryData geometryData)
 {
 	if (!backend)
 		return false;
 	
 	SVulkanCommandBuffer *commandBuffer = &(context.arrCommandBuffers[context.imageIndex]);
 	
-	if (!AX_Renderer_Backend_Vulkan_Shader_UpdateObject(&(context.objectShader), model))
+	if (!AX_Renderer_Backend_Vulkan_Shader_UpdateObject(&(context.objectShader), geometryData, contextDeltaTime))
 		return false;
 
 	// TODO: temp - remove this
@@ -1139,6 +1173,180 @@ AX_Renderer_Backend_Vulkan_UpdateObject
 
 	// issue drawing
 	vkCmdDrawIndexed(commandBuffer->instance, 6, 1, 0, 0, 0);
+
+	return true;
+}
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_CreateTexture
+(SRenderBackend backend, ReadOnlyString name, const Int32 width, const Int32 height, const UInt8 channelCount, const BytePtr pixels, const Bool hasTransparency, STexture *outTexture)
+{
+	if (!backend || !outTexture)
+		return false;
+	
+	outTexture->width = width;
+	outTexture->height = height;
+	outTexture->channelCount = channelCount;
+	outTexture->hasTransparency = hasTransparency;
+	outTexture->generation = AX_INVALID_ID;
+
+	AX_RENDERER_ALLOCATE(SVulkanTextureData, 1, textureData);
+
+	VkDeviceSize imageSize = (width * height) * channelCount;
+	VkFormat imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
+	VkBufferUsageFlags usageFlags = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	VkMemoryPropertyFlags memoryPropertyFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+	
+	SVulkanBuffer stagingBuffer;
+	if (!AX_Renderer_Backend_Vulkan_Buffer_Startup(
+		&context,
+		imageSize,
+		usageFlags,
+		memoryPropertyFlags,
+		true,
+		&stagingBuffer
+	))
+		return false;
+
+	if (!AX_Renderer_Backend_Vulkan_Buffer_LoadData(
+		0,
+		imageSize,
+		0,
+		pixels,
+		&stagingBuffer
+	))
+		return false;
+
+	if (!AX_Renderer_Backend_Vulkan_Helper_CreateImage(
+		&context,
+		VK_IMAGE_TYPE_2D,
+		
+		width,
+		height,
+		
+		imageFormat,
+		VK_IMAGE_TILING_OPTIMAL,
+		
+		VK_IMAGE_USAGE_TRANSFER_SRC_BIT | 
+		VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
+		VK_IMAGE_USAGE_SAMPLED_BIT | 
+		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+		
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		true,
+		VK_IMAGE_ASPECT_COLOR_BIT,
+		
+		&(textureData->image)
+	))
+		return false;
+
+
+	SVulkanCommandBuffer tempBuffer;
+	VkCommandPool commandPool = context.device.graphicsCommandPool;
+	VkQueue queue = context.graphicsQueue.instance;
+	
+	if (!AX_Renderer_Backend_Vulkan_CommandBuffer_AllocateBeginSingleUse(
+		&context,
+		commandPool,
+		&tempBuffer
+	))
+		return false;
+
+	if (!AX_Renderer_Backend_Vulkan_Helper_PerformImageLayoutTransition(
+		&context,
+		&tempBuffer,
+		&(textureData->image),
+		imageFormat,
+		VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+	))
+		return false;
+
+	if (!AX_Renderer_Backend_Vulkan_Helper_CopyImageFromBuffer(
+		&context, 
+		&tempBuffer,
+		&(textureData->image), 
+		stagingBuffer.instance
+	))
+		return false;
+
+	if (!AX_Renderer_Backend_Vulkan_Helper_PerformImageLayoutTransition(
+		&context,
+		&tempBuffer,
+		&(textureData->image),
+		imageFormat,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+	))
+		return false;
+
+	if (!AX_Renderer_Backend_Vulkan_CommandBuffer_EndSingleUse(
+		commandPool,
+		queue,
+		&tempBuffer
+	))
+		return false;
+
+	VkSamplerCreateInfo samplerCreateInfo = { 
+		.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, 
+		
+		.magFilter = VK_FILTER_LINEAR,
+		.minFilter = VK_FILTER_LINEAR,
+		
+		.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		
+		.anisotropyEnable = VK_TRUE,
+		.maxAnisotropy = 16,
+		
+		.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+		.unnormalizedCoordinates = VK_FALSE,
+		
+		.compareEnable = VK_FALSE,
+		.compareOp = VK_COMPARE_OP_ALWAYS,
+		
+		.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.mipLodBias = 0.0f,
+		.minLod = 0.0f,
+		.maxLod = 0.0f
+	};
+
+	AX_VK_ASSERT(
+		vkCreateSampler(
+			context.device.instance, &samplerCreateInfo, context.allocator, &(textureData->sampler)
+		)
+	);
+
+	outTexture->data = textureData;
+	
+	if (!AX_Renderer_Backend_Vulkan_Buffer_Shutdown(&stagingBuffer))
+		return false;
+
+	outTexture->generation++;
+	return true;
+}
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_DestroyTexture
+(SRenderBackend backend, STexture *outTexture)
+{
+	if (!backend)
+		return false;
+
+	AX_VK_ASSERT(vkDeviceWaitIdle(context.device.instance));
+
+	SVulkanTextureData *textureData = AX_CAST(SVulkanTextureData *, outTexture->data);
+
+	if (!AX_Renderer_Backend_Vulkan_Helper_DestroyImage(&context, &(textureData->image)))
+		return false;
+
+	vkDestroySampler(context.device.instance, textureData->sampler, context.allocator);
+
+	AX_RENDERER_DEALLOCATE(SVulkanTextureData, 1, textureData);
+	AX_HAL_Memory_Memzero(outTexture, sizeof(STexture));
 
 	return true;
 }

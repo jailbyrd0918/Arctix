@@ -38,7 +38,18 @@ AX_Renderer_Backend_Vulkan_UpdateGlobalState
 AX_API
 Bool
 AX_Renderer_Backend_Vulkan_UpdateObject
-(SRenderBackend backend, const UMat4 model);
+(SRenderBackend backend, const SGeometryData geometryData);
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_CreateTexture
+(SRenderBackend backend, ReadOnlyString name, const Int32 width, const Int32 height, const UInt8 channelCount, const BytePtr pixels, const Bool hasTransparency, STexture *outTexture);
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_DestroyTexture
+(SRenderBackend backend, STexture *outTexture);
+
 
 
 

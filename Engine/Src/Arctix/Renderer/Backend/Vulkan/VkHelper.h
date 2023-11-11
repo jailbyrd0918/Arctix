@@ -84,6 +84,16 @@ AX_Renderer_Backend_Vulkan_Helper_DestroyImage
 (const SVulkanContext *context, SVulkanImage *outImage);
 
 AX_API
+Bool
+AX_Renderer_Backend_Vulkan_Helper_PerformImageLayoutTransition
+(const SVulkanContext *context, const SVulkanCommandBuffer *commandBuffer, const SVulkanImage *image, const VkFormat format, const VkImageLayout oldLayout, const VkImageLayout newLayout);
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_Helper_CopyImageFromBuffer
+(const SVulkanContext *context, const SVulkanCommandBuffer *commandBuffer, const SVulkanImage *image, const VkBuffer buffer);
+
+AX_API
 ShaderCode
 AX_Renderer_Backend_Vulkan_Helper_GetShaderCode
 (ReadOnlyString shadersFilePath, ByteSize *outShadersCodeSize);
@@ -100,6 +110,16 @@ AX_Renderer_Backend_Vulkan_Helper_GetShaderStageProperties
 	const VkShaderStageFlagBits shaderStageFlag,
 	const VkShaderModule module
 );
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_Helper_AcquireShaderResources
+(const SVulkanContext *context, SVulkanShader *shader, UInt32 *outObjectID);
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_Helper_ReleaseShaderResources
+(const SVulkanContext *context, SVulkanShader *shader, const UInt32 objectID);
 
 AX_API
 Bool

@@ -338,7 +338,7 @@ typedef
 struct AX_Input_Mouse_Scroll_Data
 {
 	EEventCode	eventCode;
-	UInt16		value;
+	Int8		value;
 }
 SInputMouseScrollData;
 

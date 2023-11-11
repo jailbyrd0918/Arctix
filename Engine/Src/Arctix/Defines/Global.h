@@ -67,4 +67,13 @@
 #define	AX_STATIC_ARRAY_SIZE(array)	(sizeof(array) / sizeof(*(array)))
 
 
+// -- invalid ID -- //
+
+#if	defined(UINT32_MAX)
+#	define	AX_INVALID_ID		(UINT32_MAX)
+
+#else
+#	define	AX_INVALID_ID		(4294967295U)
+
+#endif
 

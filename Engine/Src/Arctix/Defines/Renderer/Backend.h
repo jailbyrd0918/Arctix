@@ -2,6 +2,7 @@
 
 #include "Arctix/Defines/Core/Math.h"
 #include "Arctix/Defines/Core/DataTypes.h"
+#include "Arctix/Defines/Resources/Texture.h"
 
 
 typedef
@@ -28,6 +29,7 @@ typedef
 struct AX_Render_Vertex
 {
 	UVec3				position;
+	UVec2				textureCoordinate;
 }
 SVertex;
 
@@ -42,6 +44,27 @@ struct AX_Render_Global_Uniform
 }
 SGlobalUniform;
 
+typedef
+struct AX_Renderer_Object_Uniform
+{
+	UVec4				diffuseColor;
+
+	UVec4				reserved0;
+	UVec4				reserved1;
+	UVec4				reserved2;
+}
+SObjectUniform;
+
+typedef 
+struct AX_Render_Geometry_Data
+{
+	UInt32				objectID;
+	UMat4				model;
+
+	STexture *			textures[16];
+}
+SGeometryData;
+
 struct AX_Render_Backend
 {
 	UInt64				frameCount;
@@ -53,7 +76,9 @@ struct AX_Render_Backend
 	Bool(*onFrameBegin)(SRenderBackend backend, const Float deltaTime);
 	Bool(*onFrameEnd)(SRenderBackend backend, const Float deltaTime);
 	Bool(*updateGlobalState)(SRenderBackend backend, const UMat4 projection, const UMat4 view, const UVec3 viewPosition, const UVec4 ambientColor, const Int32 mode);
-	Bool(*updateObject)(SRenderBackend backend, const UMat4 model);
+	Bool(*updateObject)(SRenderBackend backend, const SGeometryData geometryData);
+	Bool(*createTexture)(SRenderBackend backend, ReadOnlyString name, const Int32 width, const Int32 height, const UInt8 channelCount, const BytePtr pixels, const Bool hasTransparency, STexture *outTexture);
+	Bool(*destroyTexture)(SRenderBackend backend, STexture *outTexture);
 };
 
 #define AX_RENDERER_ALLOCATE(type, count, name)							\

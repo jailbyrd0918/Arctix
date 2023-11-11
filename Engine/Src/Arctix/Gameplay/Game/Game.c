@@ -133,44 +133,50 @@ AX_Gameplay_Game_Update
 		if (AX_HAL_Input_IsMouseButtonDown(AX_MOUSECODE_RIGHT)) {
 			SDL_ShowCursor(SDL_DISABLE);
 
-			if (AX_HAL_Input_IsKeyDown(AX_KEYCODE_W)) {
-				UVec3 forward = AX_Math_Mat4_MakeForwardVector(&(gameState->view));
-				velocity = AX_Math_Vec3_Add(velocity, forward);
+			// movement
+			{
+				if (AX_HAL_Input_IsKeyDown(AX_KEYCODE_W)) {
+					UVec3 forward = AX_Math_Mat4_MakeForwardVector(&(gameState->view));
+					velocity = AX_Math_Vec3_Add(velocity, forward);
+				}
+
+				if (AX_HAL_Input_IsKeyDown(AX_KEYCODE_S)) {
+					UVec3 backward = AX_Math_Mat4_MakeBackwardVector(&(gameState->view));
+					velocity = AX_Math_Vec3_Add(velocity, backward);
+				}
+
+				if (AX_HAL_Input_IsKeyDown(AX_KEYCODE_A)) {
+					UVec3 left = AX_Math_Mat4_MakeLeftVector(&(gameState->view));
+					velocity = AX_Math_Vec3_Add(velocity, left);
+				}
+
+				if (AX_HAL_Input_IsKeyDown(AX_KEYCODE_D)) {
+					UVec3 right = AX_Math_Mat4_MakeRightVector(&(gameState->view));
+					velocity = AX_Math_Vec3_Add(velocity, right);
+				}
 			}
 
-			if (AX_HAL_Input_IsKeyDown(AX_KEYCODE_S)) {
-				UVec3 backward = AX_Math_Mat4_MakeBackwardVector(&(gameState->view));
-				velocity = AX_Math_Vec3_Add(velocity, backward);
-			}
+			// rotation
+			{
+				Float mouseX = AX_CAST(Float, AX_HAL_Input_GetMouseX());
+				Float mouseY = AX_CAST(Float, AX_HAL_Input_GetMouseY());
 
-			if (AX_HAL_Input_IsKeyDown(AX_KEYCODE_A)) {
-				UVec3 left = AX_Math_Mat4_MakeLeftVector(&(gameState->view));
-				velocity = AX_Math_Vec3_Add(velocity, left);
-			}
+				if (firstMouse) {
+					lastMouseX = mouseX;
+					lastMouseY = mouseY;
+					firstMouse = false;
+				}
 
-			if (AX_HAL_Input_IsKeyDown(AX_KEYCODE_D)) {
-				UVec3 right = AX_Math_Mat4_MakeRightVector(&(gameState->view));
-				velocity = AX_Math_Vec3_Add(velocity, right);
-			}
+				Float xOffset = mouseX - lastMouseX;
+				Float yOffset = lastMouseY - mouseY;
 
-			Float mouseX = AX_CAST(Float, AX_HAL_Input_GetMouseX());
-			Float mouseY = AX_CAST(Float, AX_HAL_Input_GetMouseY());
+				if ((xOffset != 0) || (yOffset != 0)) {
+					lastMouseX = mouseX;
+					lastMouseY = mouseY;
 
-			if (firstMouse) {
-				lastMouseX = mouseX;
-				lastMouseY = mouseY;
-				firstMouse = false;
-			}
-
-			Float xOffset = mouseX - lastMouseX;
-			Float yOffset = lastMouseY - mouseY;
-			
-			if ((xOffset != 0) || (yOffset != 0)) {
-				lastMouseX = mouseX;
-				lastMouseY = mouseY;
-
-				_AX_Gameplay_Game_CameraYaw(xOffset * mouseSensitivity * deltaTime);
-				_AX_Gameplay_Game_CameraPitch(yOffset * mouseSensitivity * deltaTime);
+					_AX_Gameplay_Game_CameraYaw(xOffset * mouseSensitivity * deltaTime);
+					_AX_Gameplay_Game_CameraPitch(yOffset * mouseSensitivity * deltaTime);
+				}
 			}
 		}
 		else {
@@ -189,8 +195,8 @@ AX_Gameplay_Game_Update
 		}
 
 		gameState->projection = AX_Math_Mat4_Perspective(
-			AX_MATH_DEG_TO_RAD(fov),
-			AX_CAST(Float, game->gameConfig.winConfig.width) / game->gameConfig.winConfig.height,
+			AX_CAST(Float, AX_MATH_DEG_TO_RAD(fov)),
+			AX_CAST(Float, game->gameConfig.winConfig.width) / AX_CAST(Float, game->gameConfig.winConfig.height),
 			0.1f,
 			1000.f
 		);
@@ -220,6 +226,18 @@ AX_Gameplay_Game_OnResize
 	return true;
 }
 
+AX_API
+Bool
+AX_Gameplay_Game_OnScroll
+(SGame *game, const Int8 scrollValue)
+{
+	if (!game)
+		return false;
+
+	fov = AX_MATH_CLAMP(fov - scrollValue, 1.0f, 45.0f);
+
+	return true;
+}
 
 AX_API AX_INLINE
 ByteSize

@@ -26,6 +26,10 @@ Bool
 AX_Gameplay_Game_OnResize
 (SGame *game, const Int32 width, const Int32 height);
 
+AX_API
+Bool
+AX_Gameplay_Game_OnScroll
+(SGame *game, const Int8 scrollValue);
 
 AX_API AX_INLINE
 ByteSize

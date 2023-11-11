@@ -23,14 +23,26 @@ AX_Renderer_Backend_Vulkan_Shader_Shutdown
 AX_API
 Bool
 AX_Renderer_Backend_Vulkan_Shader_UpdateGlobalState
-(SVulkanShader *outShader);
+(SVulkanShader *outShader, const Float deltaTime);
 
 AX_API
 Bool
 AX_Renderer_Backend_Vulkan_Shader_UpdateObject
-(const SVulkanShader *shader, const UMat4 model);
+(SVulkanShader *shader, const SGeometryData geometryData, const Float deltaTime);
 
 AX_API
 Bool
 AX_Renderer_Backend_Vulkan_Shader_Apply
 (SVulkanShader *outShader);
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_Shader_AcquireResources
+(SVulkanShader *shader, UInt32 *outObjectID);
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_Shader_ReleaseResources
+(SVulkanShader *shader, const UInt32 objectID);
+
+

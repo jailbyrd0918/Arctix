@@ -5,11 +5,13 @@
 #include "Arctix/Core/Platform/Window/Window.h"
 #include "Arctix/Core/Containers/Array/Array.h"
 #include "Arctix/Core/Containers/String/String.h"
+#include "Arctix/Core/Math/Helper/MathHelper.h"
+#include "Arctix/Core/Math/Vector/Vec4.h"
 #include "Arctix/Core/Logging/Logging.h"
 #include "Arctix/Core/Modules/Memory/MemoryModule.h"
 
-#include "Arctix/Renderer/Backend/Vulkan/VkBuffer.h"
 #include "Arctix/Renderer/Backend/Vulkan/VkHelper.h"
+#include "Arctix/Renderer/Backend/Vulkan/VkBuffer.h"
 
 
 static SVulkanContext *shaderContext = NULL;
@@ -139,6 +141,65 @@ AX_Renderer_Backend_Vulkan_Shader_Startup
 		);
 	}
 
+	// create object descriptor properties
+	{
+		VkDescriptorSetLayoutBinding bindings[] = {
+			[0] = {
+				.binding = 0,
+				.descriptorCount = 1,
+				.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT
+			},	
+			
+			[1] = {
+				.binding = 1,
+				.descriptorCount = 1,
+				.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT
+			}
+		};
+
+		VkDescriptorSetLayoutCreateInfo layoutCreateInfo = { 
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+			.bindingCount = AX_STATIC_ARRAY_SIZE(bindings),
+			.pBindings = bindings,
+		};
+
+		AX_VK_ASSERT(
+			vkCreateDescriptorSetLayout(
+				context->device.instance, &layoutCreateInfo, context->allocator, &(outShader->objectDescriptorSetLayout)
+			)
+		);
+
+		const UInt32 localSamplerCount = 1;
+		VkDescriptorPoolSize objectPoolSizes[] = {
+			[0] = {
+				.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				.descriptorCount = 1024 // TODO: make 'max object count' configurable
+			},
+			[1] = {
+				.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.descriptorCount = localSamplerCount * 1024 // TODO: make 'max object count' configurable
+			}
+		};
+
+		VkDescriptorPoolCreateInfo objectDescPoolCreateInfo = { 
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, 
+			
+			.poolSizeCount = AX_STATIC_ARRAY_SIZE(objectPoolSizes),
+			.pPoolSizes = objectPoolSizes,
+			
+			.maxSets = 1024, // TODO: make 'max object count' configurable
+			.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
+		};
+
+		AX_VK_ASSERT(
+			vkCreateDescriptorPool(
+				context->device.instance, &objectDescPoolCreateInfo, context->allocator, &(outShader->objectDescriptorPool)
+			)
+		);
+	}
+
 	// create pipeline
 	{
 		const Float framebufferWidth = AX_CAST(Float, AX_Window_GetWidth(shaderContext->window));
@@ -167,14 +228,16 @@ AX_Renderer_Backend_Vulkan_Shader_Startup
 		};
 
 		UInt64 offset = 0;
-		#define	ATTRIBUTE_COUNT	1
+		#define	ATTRIBUTE_COUNT	2
 
 		VkFormat formats[] = {
-			VK_FORMAT_R32G32B32_SFLOAT
+			VK_FORMAT_R32G32B32_SFLOAT,
+			VK_FORMAT_R32G32_SFLOAT
 		};
 
 		ByteSize sizes[] = {
-		    sizeof(UVec3)
+		    sizeof(UVec3),
+		    sizeof(UVec2)
 		};
 
 		VkVertexInputAttributeDescription attributeDescs[ATTRIBUTE_COUNT];
@@ -191,7 +254,8 @@ AX_Renderer_Backend_Vulkan_Shader_Startup
 		}
 
 		VkDescriptorSetLayout descriptorSetLayouts[] = {
-			outShader->globalDescriptorSetLayout
+			outShader->globalDescriptorSetLayout,
+			outShader->objectDescriptorSetLayout
 		};
 
 		VkPipelineShaderStageCreateInfo stageCreateInfos[AX_STATIC_ARRAY_SIZE(outShader->stages)] = { 0 };
@@ -234,6 +298,22 @@ AX_Renderer_Backend_Vulkan_Shader_Startup
 			memoryPropertyFlags,
 			true,
 			&(outShader->globalUniformBuffer)
+		))
+			return false;
+	}
+	
+	// create object uniform buffer
+	{
+		const VkBufferUsageFlagBits usageFlags = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		const UInt32 memoryPropertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+		if (!AX_Renderer_Backend_Vulkan_Buffer_Startup(
+			shaderContext,
+			sizeof(SObjectUniform),
+			usageFlags,
+			memoryPropertyFlags,
+			true,
+			&(outShader->objectUniformBuffer)
 		))
 			return false;
 	}
@@ -284,6 +364,10 @@ AX_Renderer_Backend_Vulkan_Shader_Shutdown
 		)
 	);
 
+	// destroy object uniform buffer
+	if (!AX_Renderer_Backend_Vulkan_Buffer_Shutdown(&(outShader->objectUniformBuffer)))
+		return false;
+
 	// destroy global uniform buffer
 	if (!AX_Renderer_Backend_Vulkan_Buffer_Shutdown(&(outShader->globalUniformBuffer)))
 		return false;
@@ -294,6 +378,12 @@ AX_Renderer_Backend_Vulkan_Shader_Shutdown
 			return false;
 
 		AX_LOG_DEBUG("Engine", "Graphics pipeline destroyed.");
+	}
+
+	// destroy object descriptor properties
+	{
+		vkDestroyDescriptorPool(shaderContext->device.instance, outShader->objectDescriptorPool, shaderContext->allocator);
+		vkDestroyDescriptorSetLayout(shaderContext->device.instance, outShader->objectDescriptorSetLayout, shaderContext->allocator);
 	}
 
 	// destroy global descriptor properties
@@ -327,7 +417,7 @@ AX_Renderer_Backend_Vulkan_Shader_Shutdown
 AX_API
 Bool
 AX_Renderer_Backend_Vulkan_Shader_UpdateGlobalState
-(SVulkanShader *outShader)
+(SVulkanShader *outShader, const Float deltaTime)
 {
 	if (!outShader)
 		return false;
@@ -386,7 +476,7 @@ AX_Renderer_Backend_Vulkan_Shader_UpdateGlobalState
 AX_API
 Bool
 AX_Renderer_Backend_Vulkan_Shader_UpdateObject
-(const SVulkanShader *shader, const UMat4 model)
+(SVulkanShader *shader, const SGeometryData geometryData, const Float deltaTime)
 {
 	if (!shader)
 		return false;
@@ -394,7 +484,96 @@ AX_Renderer_Backend_Vulkan_Shader_UpdateObject
 	const UInt32 imageIndex = shaderContext->imageIndex;
 	const VkCommandBuffer commandBuffer = shaderContext->arrCommandBuffers[imageIndex].instance;
 
-	vkCmdPushConstants(commandBuffer, shader->pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UMat4), &model);
+	vkCmdPushConstants(commandBuffer, shader->pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UMat4), &(geometryData.model));
+
+	SVulkanShaderState *objectState = &(shader->objectStates[geometryData.objectID]);
+	VkDescriptorSet objectDescriptorSet = objectState->descriptorSets[imageIndex];
+	VkWriteDescriptorSet writeSet[2] = { 0 };
+	UInt32 descriptorCount = 0;
+	UInt32 descriptorIndex = 0;
+	UInt32 size = sizeof(SObjectUniform);
+	UInt64 offset = sizeof(SObjectUniform) * geometryData.objectID;
+	SObjectUniform objectUniform;
+
+	// static Float accumulator = 0.0f;
+	// accumulator += deltaTime;
+	// Float sinVal = (AX_Math_Sin(accumulator) + 1.0f) / 2.0f; // scale from (-1, 1) to (0, 1)
+	
+	objectUniform.diffuseColor = AX_Math_Vec4_Construct(1.0f, 1.0f, 1.0f, 1.0f);
+
+	if (!AX_Renderer_Backend_Vulkan_Buffer_LoadData(
+		offset, 
+		size,
+		0, 
+		&objectUniform,
+		&(shader->objectUniformBuffer)
+	))
+		return false;
+
+	if (objectState->descriptorStates[descriptorIndex].generations[imageIndex] == AX_INVALID_ID) {
+		VkDescriptorBufferInfo bufferInfo = {
+			.buffer = shader->objectUniformBuffer.instance,
+			.offset = offset,
+			.range = size
+		};
+
+		VkWriteDescriptorSet descriptorSet = { 
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			
+			.dstSet = objectDescriptorSet,
+			.dstBinding = descriptorIndex,
+			
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			
+			.pBufferInfo = &bufferInfo
+		};
+
+		writeSet[descriptorCount++] = descriptorSet;
+		objectState->descriptorStates[descriptorIndex].generations[imageIndex] = 1;
+	}
+
+	++descriptorIndex;
+
+	#define	SAMPLER_COUNT	1
+	VkDescriptorImageInfo imageInfos[SAMPLER_COUNT];
+	
+	for (UInt32 samplerIndex = 0; samplerIndex < SAMPLER_COUNT; ++samplerIndex) {
+		STexture *texture = geometryData.textures[samplerIndex];
+		UInt32 *descriptorGen = &(objectState->descriptorStates[descriptorIndex].generations[imageIndex]);
+
+		if ((texture != NULL) && ((*descriptorGen != texture->generation) || (*descriptorGen == AX_INVALID_ID))) {
+			SVulkanTextureData *textureData = AX_CAST(SVulkanTextureData *, texture->data);
+
+			imageInfos[samplerIndex].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			imageInfos[samplerIndex].imageView = textureData->image.view;
+			imageInfos[samplerIndex].sampler = textureData->sampler;
+
+			VkWriteDescriptorSet descriptor = { 
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				
+				.dstSet = objectDescriptorSet,
+				.dstBinding = descriptorIndex,
+				
+				.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.descriptorCount = 1,
+				
+				.pImageInfo = &(imageInfos[samplerIndex])
+			};
+
+			writeSet[descriptorCount++] = descriptor;
+
+			if (texture->generation != AX_INVALID_ID)
+				*descriptorGen = texture->generation;
+
+			++descriptorIndex;
+		}
+	}
+
+	if (descriptorCount > 0)
+		vkUpdateDescriptorSets(shaderContext->device.instance, descriptorCount, writeSet, 0, NULL);
+
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, shader->pipeline.layout, 1, 1, &objectDescriptorSet, 0, NULL);
 
 	return true;
 }
@@ -420,7 +599,27 @@ AX_Renderer_Backend_Vulkan_Shader_Apply
 	return true;
 }
 
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_Shader_AcquireResources
+(SVulkanShader *shader, UInt32 *outObjectID)
+{
+	if (!AX_Renderer_Backend_Vulkan_Helper_AcquireShaderResources(shaderContext, shader, outObjectID))
+		return false;
 
+	return true;
+}
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_Shader_ReleaseResources
+(SVulkanShader *shader, const UInt32 objectID)
+{
+	if (!AX_Renderer_Backend_Vulkan_Helper_ReleaseShaderResources(shaderContext, shader, objectID))
+		return false;
+
+	return true;
+}
 
 
 

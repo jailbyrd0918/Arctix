@@ -28,6 +28,8 @@ AX_Renderer_Backend_Construct
 			backend->onFrameEnd = AX_Renderer_Backend_Vulkan_OnFrameEnd;
 			backend->updateGlobalState = AX_Renderer_Backend_Vulkan_UpdateGlobalState;
 			backend->updateObject = AX_Renderer_Backend_Vulkan_UpdateObject;
+			backend->createTexture = AX_Renderer_Backend_Vulkan_CreateTexture;
+			backend->destroyTexture = AX_Renderer_Backend_Vulkan_DestroyTexture;
 		}
 		break;
 

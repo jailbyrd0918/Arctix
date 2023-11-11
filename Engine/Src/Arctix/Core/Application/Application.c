@@ -11,11 +11,13 @@
 #include "Arctix/Core/HAL/Input/AXInput.h"
 #include "Arctix/Core/Platform/Window/Window.h"
 #include "Arctix/Core/Containers/String/String.h"
-
 #include "Arctix/Core/Modules/ModuleManager.h"
 #include "Arctix/Core/Modules/Memory/MemoryModule.h"
 #include "Arctix/Core/Modules/Input/InputModule.h"
 #include "Arctix/Core/Modules/Window/WindowModule.h"
+
+#include "Arctix/Gameplay/Game/Game.h"
+
 #include "Arctix/Renderer/Module/RenderModule.h"
 
 #include <SDL2/SDL.h>
@@ -129,6 +131,20 @@ _AX_Application_OnResized
 	return true;
 }
 
+Bool
+_AX_Application_OnMouseScroll
+(VoidPtr sender, VoidPtr listener, VoidPtr data)
+{
+	SInputMouseScrollData scrollData = *(AX_CAST(SInputMouseScrollData *, data));
+
+	Int8 scrollValue = AX_CAST(Int8, scrollData.value);
+
+	if (!AX_Gameplay_Game_OnScroll(&(appState->game), scrollValue))
+		return false;
+
+	return true;
+}
+
 void
 _AX_Application_ReportStatus
 (ReadOnlyString statusMsg)
@@ -201,6 +217,7 @@ AX_Application_PreConstruct
 		AX_Module_Input_RegisterEvent(AX_EVENTCODE_KEY_PRESSED, _AX_Application_OnKey);
 		AX_Module_Input_RegisterEvent(AX_EVENTCODE_KEY_RELEASED, _AX_Application_OnKey);
 		AX_Module_Input_RegisterEvent(AX_EVENTCODE_RESIZED, _AX_Application_OnResized);
+		AX_Module_Input_RegisterEvent(AX_EVENTCODE_MOUSE_SCROLLED, _AX_Application_OnMouseScroll);
 	}
 
 	_AX_Application_ReportStatus("PreConstruct stage completed - proceeding to Construct stage...");
@@ -290,6 +307,7 @@ AX_Application_Destruct
 		AX_Module_Input_UnregisterEvent(AX_EVENTCODE_KEY_PRESSED, _AX_Application_OnKey);
 		AX_Module_Input_UnregisterEvent(AX_EVENTCODE_KEY_RELEASED, _AX_Application_OnKey);
 		AX_Module_Input_UnregisterEvent(AX_EVENTCODE_RESIZED, _AX_Application_OnResized);
+		AX_Module_Input_UnregisterEvent(AX_EVENTCODE_MOUSE_SCROLLED, _AX_Application_OnMouseScroll);
 	}
 
 	AX_ModuleManager_ShutdownModules();

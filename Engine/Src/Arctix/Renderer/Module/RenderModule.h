@@ -3,6 +3,7 @@
 #include "Arctix/Defines/Global.h"
 #include "Arctix/Defines/Renderer/Frontend.h"
 #include "Arctix/Defines/Renderer/Backend.h"
+#include "Arctix/Defines/Resources/Texture.h"
 
 
 AX_API AX_INLINE
@@ -29,6 +30,16 @@ AX_API
 Bool
 AX_Module_Render_RenderFrame
 (SRenderData renderData);
+
+AX_API
+Bool
+AX_Module_Render_CreateTexture
+(ReadOnlyString name, const Int32 width, const Int32 height, const UInt8 channelCount, const BytePtr pixel, const Bool hasTransparency, STexture *outTexture);
+
+AX_API
+Bool
+AX_Module_Render_DestroyTexture
+(STexture *outTexture);
 
 AX_API AX_INLINE
 void

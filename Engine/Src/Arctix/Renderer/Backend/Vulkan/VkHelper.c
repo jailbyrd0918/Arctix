@@ -396,6 +396,115 @@ AX_Renderer_Backend_Vulkan_Helper_DestroyImage
 	return true;
 }
 
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_Helper_PerformImageLayoutTransition
+(const SVulkanContext *context, const SVulkanCommandBuffer *commandBuffer, const SVulkanImage *image, const VkFormat format, const VkImageLayout oldLayout, const VkImageLayout newLayout)
+{
+	if (!context || !commandBuffer || !image)
+		return false;
+
+	VkAccessFlags srcAccessFlags, dstAccessFlags;
+	VkPipelineStageFlags srcStage, dstStage;
+
+	if ((oldLayout == VK_IMAGE_LAYOUT_UNDEFINED) && (newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)) {
+		srcAccessFlags = 0;
+		dstAccessFlags = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+		srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	}
+	else if ((oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) && (newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)) {
+		srcAccessFlags = VK_ACCESS_TRANSFER_WRITE_BIT;
+		dstAccessFlags = VK_ACCESS_SHADER_READ_BIT;
+
+		srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	}
+	else {
+		AX_LOG_FATAL("Engine", "Layout transition not supported!");
+		return false;
+	}
+
+	VkImageMemoryBarrier memoryBarrier = {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+
+		.oldLayout = oldLayout,
+		.newLayout = newLayout,
+
+		.srcQueueFamilyIndex = context->graphicsQueue.familyIndex,
+		.dstQueueFamilyIndex = context->graphicsQueue.familyIndex,
+
+		.image = image->instance,
+
+		.subresourceRange = {
+			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.baseMipLevel = 0,
+			.levelCount = 1,
+			.baseArrayLayer = 0,
+			.layerCount = 1
+		},
+
+		.srcAccessMask = srcAccessFlags,
+		.dstAccessMask = dstAccessFlags
+	};
+
+	vkCmdPipelineBarrier(
+		commandBuffer->instance,
+		srcStage,
+		dstStage,
+		0,
+		0,
+		NULL,
+		0,
+		NULL,
+		1,
+		&memoryBarrier
+	);
+
+	return true;
+}
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_Helper_CopyImageFromBuffer
+(const SVulkanContext *context, const SVulkanCommandBuffer *commandBuffer, const SVulkanImage *image, const VkBuffer buffer)
+{
+	if (!context || !commandBuffer || !image)
+		return false;
+
+	VkBufferImageCopy copyRegion = {
+		.bufferOffset = 0,
+		.bufferRowLength = 0,
+		.bufferImageHeight = 0,
+
+		.imageSubresource = {
+			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.mipLevel = 0,
+			.baseArrayLayer = 0,
+			.layerCount = 1
+		},
+
+		.imageExtent = {
+			.width = image->width,
+			.height = image->height,
+			.depth = 1
+		}
+	};
+
+	vkCmdCopyBufferToImage(
+		commandBuffer->instance,
+		buffer,
+		image->instance,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1,
+		&copyRegion
+	);
+
+	return true;
+}
+
 AX_API
 ShaderCode
 AX_Renderer_Backend_Vulkan_Helper_GetShaderCode
@@ -438,11 +547,79 @@ AX_Renderer_Backend_Vulkan_Helper_GetShaderStageProperties
 		VkPipelineShaderStageCreateInfo,
 
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-		
+
 		.stage = shaderStageFlag,
 		.module = module,
 		.pName = "main"
 	);
+}
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_Helper_AcquireShaderResources
+(const SVulkanContext *context, SVulkanShader *shader, UInt32 *outObjectID)
+{
+	if (!context || !shader || !outObjectID)
+		return false;
+
+	*outObjectID = shader->objectUniformBufferIndex;
+	shader->objectUniformBufferIndex++;
+
+	UInt32 objectID = *outObjectID;
+	SVulkanShaderState *objectState = &(shader->objectStates[objectID]);
+
+	for (UInt32 i = 0; i < 2; ++i)
+		for (UInt32 j = 0; j < 3; ++j)
+			objectState->descriptorStates[i].generations[j] = AX_INVALID_ID;
+
+	VkDescriptorSetLayout layouts[] = {
+		shader->objectDescriptorSetLayout,
+		shader->objectDescriptorSetLayout,
+		shader->objectDescriptorSetLayout
+	};
+
+	VkDescriptorSetAllocateInfo allocateInfo = {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+
+		.descriptorPool = shader->objectDescriptorPool,
+		.descriptorSetCount = AX_STATIC_ARRAY_SIZE(layouts),
+
+		.pSetLayouts = layouts
+	};
+
+	AX_VK_ASSERT(
+		vkAllocateDescriptorSets(
+			context->device.instance, &allocateInfo, objectState->descriptorSets
+		)
+	);
+
+	return true;
+}
+
+AX_API
+Bool
+AX_Renderer_Backend_Vulkan_Helper_ReleaseShaderResources
+(const SVulkanContext *context, SVulkanShader *shader, const UInt32 objectID)
+{
+	if (!context || !shader)
+		return false;
+
+	SVulkanShaderState *objectState = &(shader->objectStates[objectID]);
+
+	const UInt32 descriptorSetCount = 3;
+
+	AX_VK_ASSERT(
+		vkFreeDescriptorSets(
+			context->device.instance, 
+			shader->objectDescriptorPool, 
+			AX_STATIC_ARRAY_SIZE(objectState->descriptorSets), 
+			objectState->descriptorSets
+		)
+	);
+
+	AX_HAL_Memory_Memset(objectState->descriptorStates, AX_INVALID_ID, sizeof(UInt32) * 2 * 3); // TODO: get rid of magic numbers
+
+	return true;
 }
 
 AX_API
@@ -463,30 +640,30 @@ AX_Renderer_Backend_Vulkan_Helper_CreateGraphicsPipeline
 	SVulkanPipeline *outGraphicsPipeline
 )
 {
-	if (!context || !renderPass || !attributes /*|| !descriptorSetLayouts*/ || !stages)
+	if (!context || !renderPass || !attributes || !descriptorSetLayouts || !stages)
 		return false;
 
-	VkPipelineViewportStateCreateInfo viewportStateCreateInfo = { 
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, 
-		
+	VkPipelineViewportStateCreateInfo viewportStateCreateInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+
 		.viewportCount = 1,
 		.pViewports = &viewport,
-		
+
 		.scissorCount = 1,
 		.pScissors = &scissor
 	};
 
-	VkPipelineRasterizationStateCreateInfo rasterStateCreateInfo = { 
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO, 
-		
+	VkPipelineRasterizationStateCreateInfo rasterStateCreateInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+
 		.depthClampEnable = VK_FALSE,
 		.rasterizerDiscardEnable = VK_FALSE,
-		
+
 		.polygonMode = wireframe ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL,
 		.lineWidth = 1,
 		.cullMode = VK_CULL_MODE_BACK_BIT,
 		.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-		
+
 		.depthBiasEnable = VK_FALSE,
 		.depthBiasConstantFactor = 0,
 		.depthBiasClamp = 0,
@@ -495,53 +672,53 @@ AX_Renderer_Backend_Vulkan_Helper_CreateGraphicsPipeline
 
 	VkPipelineMultisampleStateCreateInfo multisampleStateCreateInfo = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-		
+
 		.sampleShadingEnable = VK_FALSE,
 		.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-		
+
 		.minSampleShading = 1,
 		.pSampleMask = 0,
-		
+
 		.alphaToCoverageEnable = VK_FALSE,
 		.alphaToOneEnable = VK_FALSE
 	};
 
-	VkPipelineDepthStencilStateCreateInfo depthStencilStateCreateInfo = { 
+	VkPipelineDepthStencilStateCreateInfo depthStencilStateCreateInfo = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-		
+
 		.depthTestEnable = VK_TRUE,
 		.depthWriteEnable = VK_TRUE,
-		
+
 		.depthCompareOp = VK_COMPARE_OP_LESS,
-		
+
 		.depthBoundsTestEnable = VK_FALSE,
 		.stencilTestEnable = VK_FALSE
 	};
 
 	VkPipelineColorBlendAttachmentState colorBlendAttachmentState = {
 		.blendEnable = VK_TRUE,
-		
+
 		.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
 		.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
 		.colorBlendOp = VK_BLEND_OP_ADD,
-		
+
 		.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
 		.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
 		.alphaBlendOp = VK_BLEND_OP_ADD,
-		
-		.colorWriteMask = 
-			VK_COLOR_COMPONENT_R_BIT | 
+
+		.colorWriteMask =
+			VK_COLOR_COMPONENT_R_BIT |
 			VK_COLOR_COMPONENT_G_BIT |
-			VK_COLOR_COMPONENT_B_BIT | 
+			VK_COLOR_COMPONENT_B_BIT |
 			VK_COLOR_COMPONENT_A_BIT
 	};
 
-	VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo = { 
+	VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-		
+
 		.logicOpEnable = VK_FALSE,
 		.logicOp = VK_LOGIC_OP_COPY,
-		
+
 		.attachmentCount = 1,
 		.pAttachments = &colorBlendAttachmentState
 	};
@@ -549,12 +726,12 @@ AX_Renderer_Backend_Vulkan_Helper_CreateGraphicsPipeline
 	VkDynamicState dynamicStates[] = {
 	    VK_DYNAMIC_STATE_VIEWPORT,
 	    VK_DYNAMIC_STATE_SCISSOR,
-	    VK_DYNAMIC_STATE_LINE_WIDTH 
+	    VK_DYNAMIC_STATE_LINE_WIDTH
 	};
 
 	VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-		
+
 		.dynamicStateCount = AX_STATIC_ARRAY_SIZE(dynamicStates),
 		.pDynamicStates = dynamicStates
 	};
@@ -565,19 +742,19 @@ AX_Renderer_Backend_Vulkan_Helper_CreateGraphicsPipeline
 		.inputRate = VK_VERTEX_INPUT_RATE_VERTEX
 	};
 
-	VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = { 
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, 
-		
+	VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+
 		.vertexBindingDescriptionCount = 1,
 		.pVertexBindingDescriptions = &bindingDesc,
-		
+
 		.vertexAttributeDescriptionCount = attributeCount,
 		.pVertexAttributeDescriptions = attributes
 	};
 
 	VkPipelineInputAssemblyStateCreateInfo inputAsmStateCreateInfo = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-		
+
 		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
 		.primitiveRestartEnable = VK_FALSE
 	};
@@ -610,12 +787,12 @@ AX_Renderer_Backend_Vulkan_Helper_CreateGraphicsPipeline
 		);
 	}
 
-	VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = { 
+	VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {
 		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-		
+
 		.stageCount = stageCount,
 		.pStages = stages,
-		
+
 		.pVertexInputState = &vertexInputStateCreateInfo,
 		.pInputAssemblyState = &inputAsmStateCreateInfo,
 		.pViewportState = &viewportStateCreateInfo,
@@ -629,18 +806,18 @@ AX_Renderer_Backend_Vulkan_Helper_CreateGraphicsPipeline
 		.layout = outGraphicsPipeline->layout,
 		.renderPass = renderPass->instance,
 		.subpass = 0,
-		
+
 		.basePipelineHandle = VK_NULL_HANDLE,
 		.basePipelineIndex = -1
 	};
 
 	AX_VK_ASSERT(
 		vkCreateGraphicsPipelines(
-			context->device.instance, 
-			VK_NULL_HANDLE, 
-			1, 
-			&graphicsPipelineCreateInfo, 
-			context->allocator, 
+			context->device.instance,
+			VK_NULL_HANDLE,
+			1,
+			&graphicsPipelineCreateInfo,
+			context->allocator,
 			&(outGraphicsPipeline->instance)
 		)
 	);
@@ -660,7 +837,7 @@ AX_Renderer_Backend_Vulkan_Helper_DestroyGraphicsPipeline
 	vkDestroyPipelineLayout(context->device.instance, outGraphicsPipeline->layout, context->allocator);
 
 	AX_HAL_Memory_Memzero(outGraphicsPipeline, sizeof(SVulkanPipeline));
-	
+
 	return true;
 }
 

@@ -238,6 +238,21 @@ struct AX_Vulkan_Buffer
 SVulkanBuffer;
 
 typedef
+struct AX_Vulkan_Descriptor_State
+{
+	UInt32						generations[3];
+}
+SVulkanDescriptorState;
+
+typedef
+struct AX_Vulkan_Shader_State
+{
+	VkDescriptorSet					descriptorSets[3];
+	SVulkanDescriptorState				descriptorStates[2];
+}
+SVulkanShaderState;
+
+typedef
 struct AX_Vulkan_Shader
 {
 	SVulkanShaderStage				stages[2]; // 2 stages: vertex and fragment
@@ -250,8 +265,23 @@ struct AX_Vulkan_Shader
 
 	SGlobalUniform					globalUniform;
 	SVulkanBuffer					globalUniformBuffer;
+
+	VkDescriptorPool				objectDescriptorPool;
+	VkDescriptorSetLayout				objectDescriptorSetLayout;
+	SVulkanBuffer					objectUniformBuffer;
+	UInt32						objectUniformBufferIndex;
+
+	SVulkanShaderState				objectStates[1024];
 }
 SVulkanShader;
+
+typedef
+struct AX_Vulkan_Texture_Data
+{
+	SVulkanImage					image;
+	VkSampler					sampler;
+}
+SVulkanTextureData;
 
 typedef
 struct AX_Vulkan_Context

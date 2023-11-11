@@ -92,7 +92,7 @@ AX_Module_Window_Startup
 	{
 		// construct SDL window
 		{
-			SDL_WindowFlags winFlags = (SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN);
+			SDL_WindowFlags winFlags = (SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN); // TODO: make this API independent
 			state->sdlWindow = SDL_CreateWindow(title, x, y, width, height, winFlags);
 			AX_ASSERT_MESSAGE(state->sdlWindow, "failed to construct SDL window!");
 		}
@@ -102,7 +102,6 @@ AX_Module_Window_Startup
 
 		// set handle window resize callback
 		SDL_SetEventFilter(AX_CAST(SDL_EventFilter, _AX_Module_Window_HandleResize), NULL);
-		//SDL_AddEventWatch(AX_CAST(SDL_EventFilter, _AX_Module_Window_HandleResize), NULL);
 
 		state->isInitialized = true;
 	}
@@ -171,8 +170,16 @@ AX_Module_Window_Update
 			case SDL_MOUSEWHEEL:
 			{
 				Int8 value = AX_CAST(Int8, event.wheel.y);
+				
 				if (value)
 					AX_Module_Input_ProcessMouse_Scroll(value);
+
+				SInputMouseScrollData data = {
+					.eventCode = AX_EVENTCODE_MOUSE_SCROLLED,
+					.value = event.wheel.y
+				};
+
+				AX_Module_Input_InvokeEvent(AX_EVENTCODE_MOUSE_SCROLLED, &data);
 			}
 			break;
 
