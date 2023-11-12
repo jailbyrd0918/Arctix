@@ -8,6 +8,7 @@
 #include "Arctix/Core/Math/Vector/Vec4.h"
 
 #include "Arctix/Core/HAL/Input/AXInput.h"
+#include "Arctix/Core/Modules/Input/InputModule.h"
 
 #include "Arctix/Renderer/Module/RenderModule.h"
 
@@ -127,6 +128,13 @@ AX_Gameplay_Game_Update
 
 	// TODO: temp - remove this
 	{
+		// swap texture
+		{
+			if (AX_HAL_Input_IsKeyPressed(AX_KEYCODE_T)) {
+				AX_Module_Input_InvokeEvent(AX_EVENTCODE_TESTUNIT_00, NULL);
+			}
+		}
+
 		const Float moveSpeed = 20.0f;
 		UVec3 velocity = AX_Math_Vec3_Zero();
 
@@ -208,6 +216,7 @@ AX_Gameplay_Game_Update
 		
 		AX_Module_Render_SetView(gameState->view);
 	}
+	// TODO (end): temp - remove this
 
 	return true;
 }

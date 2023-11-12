@@ -727,6 +727,7 @@ AX_Renderer_Backend_Vulkan_OnStartup
 			&context,
 			"Shaders",
 			"BasicShader",
+			backend->defaultTexture,
 			&(context.objectShader)
 		))
 			return false;
@@ -1339,6 +1340,8 @@ AX_Renderer_Backend_Vulkan_DestroyTexture
 	AX_VK_ASSERT(vkDeviceWaitIdle(context.device.instance));
 
 	SVulkanTextureData *textureData = AX_CAST(SVulkanTextureData *, outTexture->data);
+	if (!textureData)
+		return false;
 
 	if (!AX_Renderer_Backend_Vulkan_Helper_DestroyImage(&context, &(textureData->image)))
 		return false;

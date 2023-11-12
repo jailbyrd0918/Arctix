@@ -3,6 +3,7 @@
 #include "Arctix/Defines/Global.h"
 #include "Arctix/Defines/Renderer/Backend.h"
 #include "Arctix/Defines/Renderer/VulkanTypes.h"
+#include "Arctix/Defines/Resources/Texture.h"
 
 
 AX_API
@@ -12,6 +13,7 @@ AX_Renderer_Backend_Vulkan_Shader_Startup
 	const SVulkanContext *context,
 	ReadOnlyString shaderFileDirectory,
 	ReadOnlyString shaderFilename,
+	STexture *defaultTexture, 
 	SVulkanShader *outShader
 );
 

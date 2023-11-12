@@ -70,6 +70,8 @@ struct AX_Render_Backend
 	UInt64				frameCount;
 	SRenderBackendConfig		properties;
 
+	STexture *			defaultTexture;
+
 	Bool(*onStartup)(SRenderBackend backend, SRenderBackendConfig config, VoidPtr window);
 	Bool(*onShutdown)(SRenderBackend backend);
 	Bool(*onResized)(SRenderBackend backend, Int32 width, Int32 height);

@@ -29,6 +29,7 @@ AX_Renderer_Backend_Vulkan_Shader_Startup
 	const SVulkanContext *context,
 	ReadOnlyString shaderFileDirectory,
 	ReadOnlyString shaderFilename,
+	STexture *defaultTexture,
 	SVulkanShader *outShader
 )
 {
@@ -36,6 +37,8 @@ AX_Renderer_Backend_Vulkan_Shader_Startup
 		return false;
 
 	shaderContext = AX_CAST(SVulkanContext *, context);
+
+	outShader->diffuseTexture = defaultTexture;
 
 	// create shader module
 	{
@@ -541,6 +544,11 @@ AX_Renderer_Backend_Vulkan_Shader_UpdateObject
 	for (UInt32 samplerIndex = 0; samplerIndex < SAMPLER_COUNT; ++samplerIndex) {
 		STexture *texture = geometryData.textures[samplerIndex];
 		UInt32 *descriptorGen = &(objectState->descriptorStates[descriptorIndex].generations[imageIndex]);
+
+		if (texture->generation == AX_INVALID_ID) {
+			texture = shader->diffuseTexture;
+			*descriptorGen = AX_INVALID_ID;
+		}
 
 		if ((texture != NULL) && ((*descriptorGen != texture->generation) || (*descriptorGen == AX_INVALID_ID))) {
 			SVulkanTextureData *textureData = AX_CAST(SVulkanTextureData *, texture->data);

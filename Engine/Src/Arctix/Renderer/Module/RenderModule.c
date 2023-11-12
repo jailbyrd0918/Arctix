@@ -7,9 +7,13 @@
 #include "Arctix/Core/Math/Quaternion/Quat.h"
 #include "Arctix/Core/Logging/Logging.h"
 #include "Arctix/Core/Platform/Window/Window.h"
+#include "Arctix/Core/Containers/String/String.h"
 #include "Arctix/Core/Modules/Memory/MemoryModule.h"
+#include "Arctix/Core/Modules/Input/InputModule.h"
 
 #include "Arctix/Renderer/Backend/RenderBackend.h"
+
+#include <SDL_image.h>
 
 
 typedef
@@ -30,6 +34,88 @@ struct AX_Module_Render_State
 AX_Module_Render_State;
 
 static AX_Module_Render_State *state;
+
+// TODO: temp - remove this
+static STexture testDiffuse;
+
+
+Bool
+_AX_ResetTexture
+(STexture *outTexture)
+{
+	if (!outTexture)
+		return false;
+
+	AX_HAL_Memory_Memzero(outTexture, sizeof(STexture));
+	outTexture->generation = AX_INVALID_ID;
+
+	return true;
+}
+
+Bool
+_AX_LoadTextureFromFile
+(ReadOnlyString textureName, STexture *outTexture)
+{
+	if (!outTexture)
+		return false;
+
+	AX_LOG_TRACE("Engine", "Loading texture '%s'...", textureName);
+
+	SString filepathStr = AX_String_ConstructFormatted("Assets/Textures/%s.png", textureName);
+	STexture loadTexture;
+
+	// load texture data png
+	{
+		SDL_Surface *textureSurface = IMG_Load(AX_String_GetString(filepathStr));
+		if (!textureSurface) {
+			SDL_FreeSurface(textureSurface);
+			return false;
+		}
+
+		outTexture->width = textureSurface->w;
+		outTexture->height = textureSurface->h;
+		outTexture->channelCount = textureSurface->format->BytesPerPixel;
+		outTexture->hasTransparency = (textureSurface->format->Amask != 0);
+		
+		BytePtr textureData = textureSurface->pixels;
+		if (textureData) {
+			UInt32 currentGen = outTexture->generation;
+			outTexture->generation = AX_INVALID_ID;
+
+			ByteSize totalSize = outTexture->width * outTexture->height * outTexture->channelCount;
+			
+			if (!AX_Module_Render_CreateTexture(
+				textureName,
+				outTexture->width,
+				outTexture->height,
+				outTexture->channelCount,
+				textureData,
+				outTexture->hasTransparency,
+				&loadTexture
+			))
+				return false;
+
+			STexture oldTexture = *outTexture;
+			*outTexture = loadTexture;
+
+			AX_Module_Render_DestroyTexture(&oldTexture);
+
+			if (currentGen == AX_INVALID_ID)
+				outTexture->generation = 0;
+			else
+				outTexture->generation = currentGen + 1;
+		}
+
+		SDL_FreeSurface(textureSurface);
+	}
+
+	AX_String_Destruct(filepathStr);
+
+	AX_LOG_TRACE("Engine", "Texture '%s' loaded.", textureName);
+	return true;
+}
+
+// TODO (end): temmp - remove this
 
 
 Bool
@@ -132,6 +218,10 @@ AX_Module_Render_Startup
 	if (state->isInitialized == true)
 		return false;
 
+	if (!IMG_Init(IMG_INIT_PNG))
+		return false;
+	AX_LOG_TRACE("Engine", "SDL_image init completed (PNG mode enabled).");
+
 	// init state properties
 	{
 		if (!AX_Renderer_Backend_Construct(&(state->backend), backendConfig))
@@ -154,12 +244,22 @@ AX_Module_Render_Startup
 		state->isInitialized = true;
 	}
 
+	state->backend.defaultTexture = &(state->defaultTexture);
+
 	// invoke render backend startup event
 	if (!state->backend.onStartup(&(state->backend), backendConfig, window))
 		return false;
 
 	// create default texture
 	if (!_AX_Module_Render_CreateDefaultTexture())
+		return false;
+
+	// TODO: temp - remove this
+	AX_Module_Input_RegisterEvent(AX_EVENTCODE_TESTUNIT_00, AX_Module_Render_Event_OnDebug);
+
+	// TODO: temp remove this
+	// reset test diffuse
+	if (!_AX_ResetTexture(&testDiffuse))
 		return false;
 
 	return state->isInitialized;
@@ -173,6 +273,14 @@ AX_Module_Render_Shutdown
 	if (!state || !(state->isInitialized))
 		return false;
 
+	// TODO: temp - remove this
+	{
+		AX_Module_Input_UnregisterEvent(AX_EVENTCODE_TESTUNIT_00, AX_Module_Render_Event_OnDebug);
+
+		if (!AX_Module_Render_DestroyTexture(&testDiffuse))
+			return false;
+	}
+
 	// destroy default texture
 	if (!AX_Module_Render_DestroyTexture(&(state->defaultTexture)))
 		return false;
@@ -182,6 +290,9 @@ AX_Module_Render_Shutdown
 
 	AX_HAL_Memory_Memzero(state, sizeof(AX_Module_Render_State));
 
+	IMG_Quit();
+
+	AX_LOG_TRACE("Engine", "SDL_image shutdown completed.");
 	return true;
 }
 
@@ -238,7 +349,7 @@ AX_Module_Render_RenderFrame
 		SGeometryData data = {
 			.objectID = 0,
 			.model = model,
-			.textures[0] = &(state->defaultTexture)
+			.textures[0] = &testDiffuse
 		};
 
 		if (!(state->backend.updateObject(&(state->backend), data)))
@@ -310,5 +421,24 @@ AX_Module_Render_SetModuleState
 }
 
 
+// TODO: temp - remove this
+Bool
+AX_Module_Render_Event_OnDebug
+(VoidPtr sender, VoidPtr listener, VoidPtr data)
+{
+	ReadOnlyString textureNames[] = {
+		"gravel",
+		"concrete",
+		"wall"
+	};
+
+	static UInt8 choice = 1;
+
+	if (!_AX_LoadTextureFromFile(textureNames[choice], &testDiffuse))
+		return false;
+
+	choice = (choice + 1) % AX_STATIC_ARRAY_SIZE(textureNames);
+	return true;
+}
 
 

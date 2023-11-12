@@ -63,3 +63,7 @@ AX_Module_Render_SetModuleState
 (VoidPtr newState);
 
 
+// TODO: temp - remove this
+Bool
+AX_Module_Render_Event_OnDebug
+(VoidPtr sender, VoidPtr listener, VoidPtr data);

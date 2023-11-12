@@ -8,10 +8,12 @@ outdir				= "%{cfg.system}_%{cfg.architecture}_%{cfg.buildcfg}"
 
 include_dirs			= {}
 include_dirs["src"]		= "Engine/Src"
-include_dirs["graphics"]	= "Engine/External/Vulkan/Include"
-
+include_dirs["vulkan"]		= "Engine/External/Vulkan/Include"
+include_dirs["sdl_image"]	= "Engine/External/SDL2_image-2.6.3/include"
+	
 lib_dirs			= {}	
-lib_dirs["graphics"]		= "Engine/External/Vulkan/Lib"
+lib_dirs["vulkan"]		= "Engine/External/Vulkan/Lib"
+lib_dirs["sdl_image"]		= "Engine/External/SDL2_image-2.6.3/lib/x64"
 
 
 project "Engine"
@@ -32,18 +34,22 @@ project "Engine"
 
 	includedirs {
                 "%{include_dirs.src}",
-		"%{include_dirs.graphics}"
+		"%{include_dirs.vulkan}",
+		"%{include_dirs.sdl_image}"
+		
         }
 	
 	libdirs {
-		"%{lib_dirs.graphics}"
+		"%{lib_dirs.vulkan}",
+		"%{lib_dirs.sdl_image}"
 	}
 	
 	links {
 		"SDL2.lib",
 		"SDL2main.lib",
 		"Vulkan-1.lib",
-		"volk.lib"
+		"volk.lib",
+		"SDL2_image.lib"
 	}
 	
         defines {
@@ -85,18 +91,17 @@ project "Sandbox"
 
 	includedirs {
 		"%{include_dirs.src}",
-		"%{include_dirs.graphics}"
+		"%{include_dirs.vulkan}",
+		"%{include_dirs.sdl_image}"
 	}
 
 	libdirs {
-		"%{lib_dirs.graphics}"
+		"%{lib_dirs.vulkan}",
+		"%{lib_dirs.sdl_image}"
 	}
 
 	links {
-                "Engine",
-		
-		"SDL2.lib",
-		"SDL2main.lib"
+                "Engine"
 	}
 
         defines {

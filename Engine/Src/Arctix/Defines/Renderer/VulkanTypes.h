@@ -3,6 +3,7 @@
 
 #include "Arctix/Defines/Core/DataTypes.h"
 #include "Arctix/Defines/Core/Math.h"
+#include "Arctix/Defines/Resources/Texture.h"
 
 #include "Arctix/Core/Misc/Assertions/Assertions.h"
 
@@ -258,6 +259,8 @@ struct AX_Vulkan_Shader
 	SVulkanShaderStage				stages[2]; // 2 stages: vertex and fragment
 
 	SVulkanPipeline					pipeline;
+
+	STexture *					diffuseTexture;
 
 	VkDescriptorPool				globalDescriptorPool;
 	VkDescriptorSetLayout				globalDescriptorSetLayout;
