@@ -9,7 +9,7 @@
 AX_API
 Bool
 AX_ModuleManager_StartupModules
-(SWindowConfig winConfig, SRenderBackendConfig backendConfig);
+(SWindowConfig winConfig, SRenderBackendConfig backendConfig, SResourcesConfig resourcesConfig);
 
 AX_API
 Bool

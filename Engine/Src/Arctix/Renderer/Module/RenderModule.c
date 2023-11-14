@@ -11,9 +11,9 @@
 #include "Arctix/Core/Modules/Memory/MemoryModule.h"
 #include "Arctix/Core/Modules/Input/InputModule.h"
 
-#include "Arctix/Renderer/Backend/RenderBackend.h"
+#include "Arctix/Resources/Texture/TextureModule.h"
 
-#include <SDL_image.h>
+#include "Arctix/Renderer/Backend/RenderBackend.h"
 
 
 typedef
@@ -28,93 +28,13 @@ struct AX_Module_Render_State
 
 	Float				nearZ;
 	Float				farZ;
-
-	STexture			defaultTexture;
 }
 AX_Module_Render_State;
 
 static AX_Module_Render_State *state;
 
 // TODO: temp - remove this
-static STexture testDiffuse;
-
-
-Bool
-_AX_ResetTexture
-(STexture *outTexture)
-{
-	if (!outTexture)
-		return false;
-
-	AX_HAL_Memory_Memzero(outTexture, sizeof(STexture));
-	outTexture->generation = AX_INVALID_ID;
-
-	return true;
-}
-
-Bool
-_AX_LoadTextureFromFile
-(ReadOnlyString textureName, STexture *outTexture)
-{
-	if (!outTexture)
-		return false;
-
-	AX_LOG_TRACE("Engine", "Loading texture '%s'...", textureName);
-
-	SString filepathStr = AX_String_ConstructFormatted("Assets/Textures/%s.png", textureName);
-	STexture loadTexture;
-
-	// load texture data png
-	{
-		SDL_Surface *textureSurface = IMG_Load(AX_String_GetString(filepathStr));
-		if (!textureSurface) {
-			SDL_FreeSurface(textureSurface);
-			return false;
-		}
-
-		outTexture->width = textureSurface->w;
-		outTexture->height = textureSurface->h;
-		outTexture->channelCount = textureSurface->format->BytesPerPixel;
-		outTexture->hasTransparency = (textureSurface->format->Amask != 0);
-		
-		BytePtr textureData = textureSurface->pixels;
-		if (textureData) {
-			UInt32 currentGen = outTexture->generation;
-			outTexture->generation = AX_INVALID_ID;
-
-			ByteSize totalSize = outTexture->width * outTexture->height * outTexture->channelCount;
-			
-			if (!AX_Module_Render_CreateTexture(
-				textureName,
-				outTexture->width,
-				outTexture->height,
-				outTexture->channelCount,
-				textureData,
-				outTexture->hasTransparency,
-				&loadTexture
-			))
-				return false;
-
-			STexture oldTexture = *outTexture;
-			*outTexture = loadTexture;
-
-			AX_Module_Render_DestroyTexture(&oldTexture);
-
-			if (currentGen == AX_INVALID_ID)
-				outTexture->generation = 0;
-			else
-				outTexture->generation = currentGen + 1;
-		}
-
-		SDL_FreeSurface(textureSurface);
-	}
-
-	AX_String_Destruct(filepathStr);
-
-	AX_LOG_TRACE("Engine", "Texture '%s' loaded.", textureName);
-	return true;
-}
-
+static STexture *testDiffuse = NULL;
 // TODO (end): temmp - remove this
 
 
@@ -145,57 +65,6 @@ _AX_Module_Render_OnFrameEnd
 	return true;
 }
 
-Bool
-_AX_Module_Render_CreateDefaultTexture
-(void)
-{
-	AX_LOG_TRACE("Engine", "Creating default texture...");
-
-	#define	DIMENSION	256
-	#define	CHANNELS	4
-	#define	GRID_SIZE	32
-
-	AX_RENDERER_ALLOCATE(UInt8, (DIMENSION * DIMENSION) * CHANNELS, pixels);
-	AX_HAL_Memory_Memset(pixels, 0x00FFFF, (DIMENSION * DIMENSION) * CHANNELS);
-
-	// black and purple checkered texture
-	for (UInt64 row = 0; row < DIMENSION; ++row) {
-		for (UInt64 col = 0; col < DIMENSION; ++col) {
-			UInt64 index = (row * DIMENSION) + col;
-			UInt64 bitmapIndex = index * CHANNELS;
-
-			if ((((row / GRID_SIZE) + (col / GRID_SIZE)) % 2) == 0) {
-				pixels[bitmapIndex + 0] = 128;
-				pixels[bitmapIndex + 1] = 0;
-				pixels[bitmapIndex + 2] = 128;
-				pixels[bitmapIndex + 3] = 255;
-			}
-			else {
-				pixels[bitmapIndex + 0] = 0;
-				pixels[bitmapIndex + 1] = 0;
-				pixels[bitmapIndex + 2] = 0;
-				pixels[bitmapIndex + 3] = 255;
-			}
-		}
-	}
-
-	if (!AX_Module_Render_CreateTexture(
-		"default",
-		DIMENSION,
-		DIMENSION,
-		CHANNELS,
-		pixels,
-		false,
-		&(state->defaultTexture)
-	))
-		return false;
-
-	AX_RENDERER_DEALLOCATE(UInt8, (DIMENSION * DIMENSION) * CHANNELS, pixels);
-
-	AX_LOG_TRACE("Engine", "Default texture created.");
-	return true;
-}
-
 
 AX_API AX_INLINE
 ByteSize
@@ -217,10 +86,6 @@ AX_Module_Render_Startup
 
 	if (state->isInitialized == true)
 		return false;
-
-	if (!IMG_Init(IMG_INIT_PNG))
-		return false;
-	AX_LOG_TRACE("Engine", "SDL_image init completed (PNG mode enabled).");
 
 	// init state properties
 	{
@@ -244,23 +109,12 @@ AX_Module_Render_Startup
 		state->isInitialized = true;
 	}
 
-	state->backend.defaultTexture = &(state->defaultTexture);
-
 	// invoke render backend startup event
 	if (!state->backend.onStartup(&(state->backend), backendConfig, window))
 		return false;
 
-	// create default texture
-	if (!_AX_Module_Render_CreateDefaultTexture())
-		return false;
-
 	// TODO: temp - remove this
 	AX_Module_Input_RegisterEvent(AX_EVENTCODE_TESTUNIT_00, AX_Module_Render_Event_OnDebug);
-
-	// TODO: temp remove this
-	// reset test diffuse
-	if (!_AX_ResetTexture(&testDiffuse))
-		return false;
 
 	return state->isInitialized;
 }
@@ -276,23 +130,13 @@ AX_Module_Render_Shutdown
 	// TODO: temp - remove this
 	{
 		AX_Module_Input_UnregisterEvent(AX_EVENTCODE_TESTUNIT_00, AX_Module_Render_Event_OnDebug);
-
-		if (!AX_Module_Render_DestroyTexture(&testDiffuse))
-			return false;
 	}
-
-	// destroy default texture
-	if (!AX_Module_Render_DestroyTexture(&(state->defaultTexture)))
-		return false;
 
 	if (!(state->backend.onShutdown(&(state->backend))))
 		return false;
 
 	AX_HAL_Memory_Memzero(state, sizeof(AX_Module_Render_State));
 
-	IMG_Quit();
-
-	AX_LOG_TRACE("Engine", "SDL_image shutdown completed.");
 	return true;
 }
 
@@ -346,10 +190,13 @@ AX_Module_Render_RenderFrame
 		UVec3 zeroVec = AX_Math_Vec3_Zero();
 		UMat4 model = AX_Math_Mat4_MakeTranslation(&zeroVec);
 
+		if (!testDiffuse)
+			testDiffuse = AX_Module_Texture_GetDefault();
+
 		SGeometryData data = {
 			.objectID = 0,
 			.model = model,
-			.textures[0] = &testDiffuse
+			.textures[0] = testDiffuse
 		};
 
 		if (!(state->backend.updateObject(&(state->backend), data)))
@@ -432,12 +279,17 @@ AX_Module_Render_Event_OnDebug
 		"wall"
 	};
 
-	static UInt8 choice = 1;
-
-	if (!_AX_LoadTextureFromFile(textureNames[choice], &testDiffuse))
-		return false;
-
+	static UInt8 choice = 0;
+	ReadOnlyString oldName = textureNames[choice];
+	
 	choice = (choice + 1) % AX_STATIC_ARRAY_SIZE(textureNames);
+
+	// acquire texture
+	testDiffuse = AX_Module_Texture_Acquire(textureNames[choice], true);
+
+	// release old texture
+	AX_Module_Texture_Release(oldName);
+
 	return true;
 }
 

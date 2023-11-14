@@ -10,6 +10,8 @@
 #include "Arctix/Core/Logging/Logging.h"
 #include "Arctix/Core/Modules/Memory/MemoryModule.h"
 
+#include "Arctix/Resources/Texture/TextureModule.h"
+
 #include "Arctix/Renderer/Backend/Vulkan/VkHelper.h"
 #include "Arctix/Renderer/Backend/Vulkan/VkBuffer.h"
 
@@ -29,7 +31,6 @@ AX_Renderer_Backend_Vulkan_Shader_Startup
 	const SVulkanContext *context,
 	ReadOnlyString shaderFileDirectory,
 	ReadOnlyString shaderFilename,
-	STexture *defaultTexture,
 	SVulkanShader *outShader
 )
 {
@@ -37,8 +38,6 @@ AX_Renderer_Backend_Vulkan_Shader_Startup
 		return false;
 
 	shaderContext = AX_CAST(SVulkanContext *, context);
-
-	outShader->diffuseTexture = defaultTexture;
 
 	// create shader module
 	{
@@ -291,8 +290,9 @@ AX_Renderer_Backend_Vulkan_Shader_Startup
 
 	// create global uniform buffer
 	{
+		const VkMemoryPropertyFlagBits deviceLocalBit = shaderContext->device.gpu.localBitSupported ? VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT : 0;
 		const VkBufferUsageFlagBits usageFlags = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		const UInt32 memoryPropertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		const UInt32 memoryPropertyFlags = deviceLocalBit | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
 		if (!AX_Renderer_Backend_Vulkan_Buffer_Startup(
 			shaderContext,
@@ -307,8 +307,9 @@ AX_Renderer_Backend_Vulkan_Shader_Startup
 	
 	// create object uniform buffer
 	{
+		const VkMemoryPropertyFlagBits deviceLocalBit = shaderContext->device.gpu.localBitSupported ? VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT : 0;
 		const VkBufferUsageFlagBits usageFlags = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		const UInt32 memoryPropertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		const UInt32 memoryPropertyFlags = deviceLocalBit | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
 		if (!AX_Renderer_Backend_Vulkan_Buffer_Startup(
 			shaderContext,
@@ -544,13 +545,14 @@ AX_Renderer_Backend_Vulkan_Shader_UpdateObject
 	for (UInt32 samplerIndex = 0; samplerIndex < SAMPLER_COUNT; ++samplerIndex) {
 		STexture *texture = geometryData.textures[samplerIndex];
 		UInt32 *descriptorGen = &(objectState->descriptorStates[descriptorIndex].generations[imageIndex]);
+		UInt32 *descriptorID = &(objectState->descriptorStates[descriptorIndex].ids[imageIndex]);
 
 		if (texture->generation == AX_INVALID_ID) {
-			texture = shader->diffuseTexture;
+			texture = AX_Module_Texture_GetDefault();
 			*descriptorGen = AX_INVALID_ID;
 		}
 
-		if ((texture != NULL) && ((*descriptorGen != texture->generation) || (*descriptorGen == AX_INVALID_ID))) {
+		if ((texture != NULL) && ((*descriptorID != texture->id) || (*descriptorGen != texture->generation) || (*descriptorGen == AX_INVALID_ID))) {
 			SVulkanTextureData *textureData = AX_CAST(SVulkanTextureData *, texture->data);
 
 			imageInfos[samplerIndex].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

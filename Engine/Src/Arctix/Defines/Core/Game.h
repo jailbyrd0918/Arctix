@@ -2,6 +2,7 @@
 
 #include "Arctix/Defines/Core/DataTypes.h"
 #include "Arctix/Defines/Core/Window.h"
+#include "Arctix/Defines/Resources/Resources.h"
 #include "Arctix/Defines/Renderer/Backend.h"
 
 
@@ -15,6 +16,9 @@ struct AX_Game_Configuration
 
 	SRenderBackendConfig
 		backendConfig;
+
+	SResourcesConfig
+		resourcesConfig;
 
 	UInt32
 		maxFrameRate;

@@ -224,6 +224,18 @@ _AX_Renderer_Backend_Vulkan_Device_SelectGPU
 		VkPhysicalDeviceMemoryProperties memory;
 		vkGetPhysicalDeviceMemoryProperties(gpus[i], &memory);
 
+		Bool localBitSupported = false;
+		for (UInt32 i = 0; i < memory.memoryTypeCount; ++i) {
+			Bool supported = 
+				AX_BIT_FLAG_IF_SET(memory.memoryTypes[i].propertyFlags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) && 
+				AX_BIT_FLAG_IF_SET(memory.memoryTypes[i].propertyFlags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		
+			if (supported) {
+				localBitSupported = true;
+				break;
+			}
+		}
+
 		SVulkanGpuRequirements req = {
 			.queueSupportFlags =
 				AX_VK_GPU_QUEUE_SUPPORT_FLAG_GRAPHICS |
@@ -257,6 +269,7 @@ _AX_Renderer_Backend_Vulkan_Device_SelectGPU
 			deviceContext->device.gpu.features = features;
 			deviceContext->device.gpu.properties = properties;
 			deviceContext->device.gpu.memory = memory;
+			deviceContext->device.gpu.localBitSupported = localBitSupported;
 
 			return true;
 		}

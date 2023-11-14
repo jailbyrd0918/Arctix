@@ -17,7 +17,7 @@ typedef
 struct AX_Module_Memory_State
 {
 	SMap		allocMap;
-	RawString *allocKeys;
+	RawString *	allocKeys;
 
 	ByteSize	usedMemory;
 	UInt64		numAllocs;
@@ -35,7 +35,8 @@ static RawString memoryTagKeys[AX_MEMORY_TAGS_TOTAL] = {
 	"Containers ",
 	"Allocators ",
 	"Delegates  ",
-	"Renderer   "
+	"Renderer   ",
+	"Resources  "
 };
 
 

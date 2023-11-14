@@ -50,6 +50,8 @@ struct AX_Vulkan_GPU
 	VkPhysicalDeviceProperties			properties;
 	VkPhysicalDeviceMemoryProperties		memory;
 	VkPhysicalDeviceFeatures			features;
+
+	Bool						localBitSupported;
 }
 SVulkanGPU;
 
@@ -242,6 +244,7 @@ typedef
 struct AX_Vulkan_Descriptor_State
 {
 	UInt32						generations[3];
+	UInt32						ids[3];
 }
 SVulkanDescriptorState;
 
@@ -259,8 +262,6 @@ struct AX_Vulkan_Shader
 	SVulkanShaderStage				stages[2]; // 2 stages: vertex and fragment
 
 	SVulkanPipeline					pipeline;
-
-	STexture *					diffuseTexture;
 
 	VkDescriptorPool				globalDescriptorPool;
 	VkDescriptorSetLayout				globalDescriptorSetLayout;
@@ -320,7 +321,7 @@ struct AX_Vulkan_Context
 
 	Bool						recreatingSwapchain;
 
-	SVulkanShader					objectShader;
+	SVulkanShader					materialShader;
 
 	SVulkanBuffer					vertexBuffer;
 	UInt64						vertexOffset;

@@ -727,8 +727,7 @@ AX_Renderer_Backend_Vulkan_OnStartup
 			&context,
 			"Shaders",
 			"BasicShader",
-			backend->defaultTexture,
-			&(context.objectShader)
+			&(context.materialShader)
 		))
 			return false;
 
@@ -825,7 +824,7 @@ AX_Renderer_Backend_Vulkan_OnStartup
 			UInt32 objectID = 0;
 
 			if (!AX_Renderer_Backend_Vulkan_Shader_AcquireResources(
-				&(context.objectShader),
+				&(context.materialShader),
 				&objectID
 			))
 				return false;
@@ -849,7 +848,7 @@ AX_Renderer_Backend_Vulkan_OnShutdown
 		// wait for all operations to complete
 		AX_VK_ASSERT(vkDeviceWaitIdle(context.device.instance));
 
-		if (!AX_Renderer_Backend_Vulkan_Shader_ReleaseResources(&(context.objectShader), 0))
+		if (!AX_Renderer_Backend_Vulkan_Shader_ReleaseResources(&(context.materialShader), 0))
 			return false;
 
 		// buffers
@@ -857,7 +856,7 @@ AX_Renderer_Backend_Vulkan_OnShutdown
 			return false;
 
 		// object shader
-		if (!AX_Renderer_Backend_Vulkan_Shader_Shutdown(&(context.objectShader)))
+		if (!AX_Renderer_Backend_Vulkan_Shader_Shutdown(&(context.materialShader)))
 			return false;
 
 		// images in flight
@@ -1134,13 +1133,13 @@ AX_Renderer_Backend_Vulkan_UpdateGlobalState
 	
 	SVulkanCommandBuffer *commandBuffer = &(context.arrCommandBuffers[context.imageIndex]);
 
-	if(!AX_Renderer_Backend_Vulkan_Shader_Apply(&(context.objectShader)))
+	if(!AX_Renderer_Backend_Vulkan_Shader_Apply(&(context.materialShader)))
 		return false;
 
-	context.objectShader.globalUniform.projection = projection;
-	context.objectShader.globalUniform.view = view;
+	context.materialShader.globalUniform.projection = projection;
+	context.materialShader.globalUniform.view = view;
 
-	if (!AX_Renderer_Backend_Vulkan_Shader_UpdateGlobalState(&(context.objectShader), contextDeltaTime))
+	if (!AX_Renderer_Backend_Vulkan_Shader_UpdateGlobalState(&(context.materialShader), contextDeltaTime))
 		return false;
 
 	return true;
@@ -1156,11 +1155,11 @@ AX_Renderer_Backend_Vulkan_UpdateObject
 	
 	SVulkanCommandBuffer *commandBuffer = &(context.arrCommandBuffers[context.imageIndex]);
 	
-	if (!AX_Renderer_Backend_Vulkan_Shader_UpdateObject(&(context.objectShader), geometryData, contextDeltaTime))
+	if (!AX_Renderer_Backend_Vulkan_Shader_UpdateObject(&(context.materialShader), geometryData, contextDeltaTime))
 		return false;
 
 	// TODO: temp - remove this
-	if (!AX_Renderer_Backend_Vulkan_Shader_Apply(&(context.objectShader)))
+	if (!AX_Renderer_Backend_Vulkan_Shader_Apply(&(context.materialShader)))
 		return false;
 
 	// bind vertex buffer

@@ -34,10 +34,18 @@ AX_Game_Configure
 		.mode = AX_RENDER_BACKEND_VULKAN
 	};
 
+	SResourcesConfig resourcesConfig = {
+		.fileDir = "Assets/Textures", // TODO: remove the 'Texture' part (since the file is about all assets in general
+		.maxTextureCount = 5
+	};
+
 	SGameConfig gameConfig = {
 		.winConfig = winConfig,
 		.backendConfig = backendConfig,
+		.resourcesConfig = resourcesConfig,
+
 		.maxFrameRate = 120,
+
 		.onStart = OnStart,
 		.onUpdate = OnUpdate
 	};

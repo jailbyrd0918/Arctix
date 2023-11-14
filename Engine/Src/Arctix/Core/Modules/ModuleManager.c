@@ -3,11 +3,11 @@
 #include "Arctix/Core/Platform/Filesystem/Filesystem.h"
 #include "Arctix/Core/HAL/Memory/AXMemory.h"
 #include "Arctix/Core/Memory/Allocators/MemArena.h"
-
 #include "Arctix/Core/Modules/Input/InputModule.h"
 #include "Arctix/Core/Modules/Memory/MemoryModule.h"
 #include "Arctix/Core/Modules/Window/WindowModule.h"
 #include "Arctix/Renderer/Module/RenderModule.h"
+#include "Arctix/Resources/Module/ResourcesModule.h"
 
 #include "Arctix/Core/Misc/Assertions/Assertions.h"
 
@@ -18,21 +18,16 @@ struct AX_Module_Manager_State
 	SMemArena
 		moduleAllocator;
 
-	ByteSize
-		memoryModuleSize,
-		loggingModuleSize,
-		inputModuleSize,
-		windowModuleSize,
-		renderModuleSize;
-
 	VoidPtr
 		memoryModule,
 		loggingModule,
 		inputModule,
 		windowModule,
-		renderModule;
+		renderModule,
+		resourcesModule;
 }
 AX_Module_Manager_State;
+
 
 static	AX_Module_Manager_State *state;
 
@@ -40,7 +35,7 @@ static	AX_Module_Manager_State *state;
 AX_API
 Bool
 AX_ModuleManager_StartupModules
-(SWindowConfig winConfig, SRenderBackendConfig backendConfig)
+(SWindowConfig winConfig, SRenderBackendConfig backendConfig, SResourcesConfig resourcesConfig)
 {
 	// construct and initialize module manager state
 	state = AX_HAL_Memory_Malloc(sizeof(AX_Module_Manager_State));
@@ -50,7 +45,8 @@ AX_ModuleManager_StartupModules
 		AX_Logging_GetModuleSize() +
 		AX_Module_Input_GetModuleSize() +
 		AX_Module_Window_GetModuleSize() +
-		AX_Module_Render_GetModuleSize();
+		AX_Module_Render_GetModuleSize() +
+		AX_Module_Resources_GetTotalSize();
 
 	state->moduleAllocator = AX_Memory_Arena_Construct(totalSize);
 
@@ -93,6 +89,16 @@ AX_ModuleManager_StartupModules
 				"Startup Module - render module startup failed!"
 			);
 		}
+
+		// resource module
+		{
+			state->resourcesModule = AX_Memory_Arena_AllocateBlock(state->moduleAllocator, AX_Module_Resources_GetModuleSize());
+
+			AX_ASSERT_MESSAGE(
+				AX_Module_Resources_Startup(state->resourcesModule, resourcesConfig, state->moduleAllocator),
+				"Startup Module - resources module startup failed!"
+			);
+		}
 	}
 
 	return true;
@@ -114,6 +120,9 @@ Bool
 AX_ModuleManager_ShutdownModules
 (void)
 {
+	// resources module
+	AX_ASSERT_MESSAGE(AX_Module_Resources_Shutdown(), "Shutdown Module - resources module shutdown failed!");
+
 	// render module
 	AX_ASSERT_MESSAGE(AX_Module_Render_Shutdown(), "Shutdown Module - render module shutdown failed!");
 

@@ -568,9 +568,12 @@ AX_Renderer_Backend_Vulkan_Helper_AcquireShaderResources
 	UInt32 objectID = *outObjectID;
 	SVulkanShaderState *objectState = &(shader->objectStates[objectID]);
 
-	for (UInt32 i = 0; i < 2; ++i)
-		for (UInt32 j = 0; j < 3; ++j)
+	for (UInt32 i = 0; i < 2; ++i) {
+		for (UInt32 j = 0; j < 3; ++j) {
 			objectState->descriptorStates[i].generations[j] = AX_INVALID_ID;
+			objectState->descriptorStates[i].ids[j] = AX_INVALID_ID;
+		}
+	}
 
 	VkDescriptorSetLayout layouts[] = {
 		shader->objectDescriptorSetLayout,
@@ -617,7 +620,11 @@ AX_Renderer_Backend_Vulkan_Helper_ReleaseShaderResources
 		)
 	);
 
-	AX_HAL_Memory_Memset(objectState->descriptorStates, AX_INVALID_ID, sizeof(UInt32) * 2 * 3); // TODO: get rid of magic numbers
+	AX_HAL_Memory_Memset(
+		objectState->descriptorStates, 
+		AX_INVALID_ID, 
+		sizeof(SVulkanDescriptorState) * AX_STATIC_ARRAY_SIZE(objectState->descriptorStates)
+	);
 
 	return true;
 }

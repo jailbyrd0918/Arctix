@@ -205,7 +205,8 @@ AX_Application_PreConstruct
 
 	AX_ModuleManager_StartupModules(
 		appState->game.gameConfig.winConfig,
-		appState->game.gameConfig.backendConfig
+		appState->game.gameConfig.backendConfig,
+		appState->game.gameConfig.resourcesConfig
 	);
 
 	// init window module state

@@ -13,7 +13,6 @@ AX_Renderer_Backend_Vulkan_Shader_Startup
 	const SVulkanContext *context,
 	ReadOnlyString shaderFileDirectory,
 	ReadOnlyString shaderFilename,
-	STexture *defaultTexture, 
 	SVulkanShader *outShader
 );
 
